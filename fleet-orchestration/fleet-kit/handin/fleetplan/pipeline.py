@@ -81,53 +81,37 @@ def repair_until_valid(sc: Scenario, routes: Dict[str, List[dict]], groups: Dict
 
 def prune_scouts(W: World, sol: alns.Sol, air: realize.Airspace, routes: Dict[str, List[dict]],
                  groups: Dict[str, List[str]], deadline: float) -> None:
-    """Rebuilds scouts without the hostile observations nobody engages, when that stays valid."""
-    engaged_T = {}
-    for cid, es in groups.items():
-        engaged_T[cid] = min(routes[e][-1]["t"] for e in es)
+    """Rebuilds scouts without the hostile observations nobody engages, when that stays valid.
+
+    Works from the realised routes (a tour may fly on another scout than the ALNS planned)."""
+    engaged_T = {cid: min(routes[e][-1]["t"] for e in es) for cid, es in groups.items()}
     by_id = {c.id: c for c in W.cands}
+    scouts = {s.id: s for s in W.scouts}
     confirm = W.rules.confirm_margin_s
-    for r in sol.routes:
-        aid = r.s.id
-        if aid not in routes or time.monotonic() > deadline:
-            continue
-        obs = [w["target"] for w in routes[aid] if w.get("action") == "observe"]
-        keep = [cid for cid in obs if by_id[cid].kind == "u" or cid in engaged_T]
+    for aid in [a for a in routes if a in scouts]:
+        if time.monotonic() > deadline:
+            break
+        obs = [w for w in routes[aid] if w.get("action") == "observe"]
+        keep = [w for w in obs if by_id[w["target"]].kind == "u" or w["target"] in engaged_T]
         if len(keep) == len(obs):
             continue
         if not keep:
-            # nothing useful: drop the scout entirely
             routes.pop(aid)
             air.drop(aid)
             continue
-        idx = [by_id[c].idx for c in keep]
-        pts = [r.pts[r.cands.index(j)] if j in r.cands else (by_id[W.cands[j].id].x, by_id[W.cands[j].id].y)
-               for j in idx]
+        idx = [by_id[w["target"]].idx for w in keep]
+        pts = [(w["x"], w["y"]) for w in keep]
         old = air.items.pop(aid)
-        cache: dict = {}
-        done = False
-        for land in realize.LAND_DELAYS:
-            for delta in realize.SCOUT_DELTAS:
-                for z in realize.SCOUT_Z:
-                    wps, ends = realize.build_scout(W, r.s, idx, pts, z, delta, land, cache)
-                    if wps is None:
-                        continue
-                    if any(ends[j] > engaged_T[W.cands[j].id] - confirm - 0.2
-                           for j in idx if W.cands[j].id in engaged_T):
-                        continue
-                    it = realize.Item(aid, wps, r.s.ac)
-                    if it.energy >= old.energy:
-                        continue
-                    if not air.conflicts(it):
-                        air.commit(it)
-                        routes[aid] = wps
-                        done = True
-                        break
-                if done:
-                    break
-            if done:
-                break
-        if not done:
+
+        def ok(it, ends, old=old):
+            return it.energy < old.energy and all(
+                ends[j] <= engaged_T[W.cands[j].id] - confirm - 0.2 for j in idx if W.cands[j].id in engaged_T)
+
+        placed = realize._try_place(W, scouts[aid], idx, pts, air, deadline, {}, accept=ok)
+        if placed:
+            air.commit(placed[0])
+            routes[aid] = placed[0].wps
+        else:
             air.commit(old)
 
 

@@ -12,6 +12,7 @@ import random
 import time
 from typing import Dict, List, Optional, Tuple
 
+from .hungarian import assign
 from .world import GROUP_DT, Cand, ScoutInfo, World, XY
 
 INF = math.inf
@@ -218,7 +219,8 @@ class Params:
         self.t0_frac = kw.get("t0_frac", 0.02)
         self.reaction = kw.get("reaction", 0.2)
         self.segment = kw.get("segment", 30)
-        self.stall = kw.get("stall", 20000)   # stop after this many iterations without a new best
+        self.stall = kw.get("stall", 20000)
+        self.reassign = kw.get("reassign", 1)   # Hungarian tour -> scout reassignment each iteration   # stop after this many iterations without a new best
 
 
 def _gain(W: World, j: int, d_energy: float, d_end: float, P: Params) -> float:
@@ -351,6 +353,51 @@ def reoptimise_points(W: World, sol: Sol, k: int) -> None:
             r.end, r.energy, r.ends = end, energy, ends
 
 
+def reassign_tours(W: World, sol: Sol) -> bool:
+    """Gives each tour to the scout that flies it cheapest (Hungarian on tours x scouts).
+
+    Scouts differ in battery, speed and consumption; a long tour on a small-battery scout can
+    block contacts that only a big-battery scout could reach. Returns True if anything moved.
+    """
+    tours = [r for r in sol.routes if r.cands]
+    if len(tours) < 1 or len(tours) > len(sol.routes):
+        return False
+    lam = W.rules.lambda_e
+    cost, cache = [], {}
+    for r in tours:
+        row = []
+        mid = r.legs[1:-1]
+        for s in W.scouts:
+            if s is r.s:
+                row.append(lam * r.energy)
+                cache[(id(r), s.k)] = (r.legs, r.end, r.energy, r.ends)
+                continue
+            legs = [W.leg(s.home, r.pts[0])] + mid + [W.leg(r.pts[-1], s.home)]
+            ok, end, energy, ends = forward(W, s, r.cands, legs)
+            if ok:
+                row.append(lam * energy)
+                cache[(id(r), s.k)] = (legs, end, energy, ends)
+            else:
+                row.append(INF)
+        cost.append(row)
+    res = assign(cost)
+    if any(c is None for c in res):
+        return False
+    if all(tours[i].s.k == res[i] for i in range(len(tours))):
+        return False
+    new_routes = [Route(s) for s in W.scouts]
+    for i, r in enumerate(tours):
+        k = res[i]
+        nr = new_routes[k]
+        nr.cands, nr.pts = list(r.cands), list(r.pts)
+        nr.legs, nr.end, nr.energy, nr.ends = cache[(id(r), k)]
+        nr.legs = list(nr.legs)
+        for j in nr.cands:
+            sol.where[j] = k
+    sol.routes = new_routes
+    return True
+
+
 # ---- destroy operators ----------------------------------------------------------------------
 
 def _routed(sol: Sol) -> List[int]:
@@ -472,6 +519,10 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
         _, regret, noise = REPAIRS[ri]
         before = {k: len(r.cands) for k, r in enumerate(new.routes)}
         repair(W, new, pool, rng, P, regret=regret, noise=noise * P.noise)
+        if P.reassign and reassign_tours(W, new):
+            touched = set(range(len(new.routes)))
+            pool = [c.idx for c in W.cands if c.idx not in new.where]
+            repair(W, new, pool, rng, P, regret=regret, noise=noise * P.noise)
         for k, r in enumerate(new.routes):
             if k in touched or len(r.cands) != before[k]:
                 reoptimise_points(W, new, k)
