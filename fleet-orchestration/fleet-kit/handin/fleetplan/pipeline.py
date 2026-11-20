@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import math
+import os
 import re
 import time
 from typing import Dict, List, Optional, Tuple
@@ -199,9 +200,10 @@ def solve(sc: Scenario, t_start: float, budget: float, log: Optional[dict] = Non
     P, shares = level_params(sc.level)
     W = World(sc)
     log["candidates"] = len(W.cands)
-    t_alns = t_start + budget * shares["alns"]
-    best = alns.run(W, t_alns, P, seed=sc.seed, log=log)
-    t_real = t_start + budget * shares["realise"]
+    # the 3D realisation normally takes < 0.5 s; always leave it at least 3 s
+    t_alns = t_start + min(budget * shares["alns"], budget - 3.0)
+    best = alns.run(W, t_alns, P, seed=sc.seed + int(os.environ.get("FLEET_SEED", "0")), log=log)
+    t_real = t_start + max(budget * shares["realise"], budget - 1.0)
     routes, groups, air = realize.realise(W, best, t_real)
     prune_scouts(W, best, air, routes, groups, t_real)
     if verify:

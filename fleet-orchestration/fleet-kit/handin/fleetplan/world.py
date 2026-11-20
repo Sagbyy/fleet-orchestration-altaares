@@ -18,9 +18,9 @@ SCOUT_Z = (30.0, 70.0)
 SCOUT_Z_MODEL = 30.0
 GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "1") == "1"   # effectors may fly [home, engage] at z = 0
 EFF_Z = ((0.0,) if GROUND_RUN else ()) + (30.0, 40.0, 80.0, 110.0, 150.0)   # cheapest conflict-free layer wins
-EFF_Z_MODEL = 150.0                  # conservative layer for earliest-arrival estimates
+EFF_Z_MODEL = 40.0                   # layer for earliest-arrival estimates (most effectors fly low)
 EFF_Z_ENERGY = 40.0                  # typical layer for energy estimates
-GROUP_DT = 3.0         # arrival spacing between effectors of one engagement
+GROUP_DT = 2.0         # arrival spacing between effectors of one engagement
 RING_SAMPLES = 48
 
 
@@ -30,13 +30,17 @@ class ScoutInfo:
         self.home: XY = (ac.home[0], ac.home[1])
         p = ac.power
         self.v_real = V_SAFE * ac.v_h_mps
-        self.v_model = 0.97 * ac.v_h_mps
+        self.v_model = 0.985 * ac.v_h_mps
+        self.p0, self.kv = p.p0_w, p.k_v
         # climb-out and landing are flown diagonally on the first and last legs (R2 only bounds
         # the altitude of intermediate waypoints), so they cost almost no extra time
         self.climb_t = 1.0
         self.land_t = 1.0
         epm = lambda v: (p.p0_w + p.k_v * v * v) / v / 3600.0  # noqa: E731
         self.e_per_m = max(epm(self.v_model), epm(self.v_real))
+        # best-range speed, used when the battery is what limits the tour
+        self.v_eco = min(self.v_model, max(best_range_speed(p), 0.6 * self.v_model))
+        self.e_per_m_eco = epm(self.v_eco) * 1.01
         self.hover = p.p0_w / 3600.0
         self.fixed_wh = p.e_climb_wh_per_m * SCOUT_Z_MODEL + self.hover * (self.climb_t + self.land_t)
         self.usable = ac.usable_wh - 0.2

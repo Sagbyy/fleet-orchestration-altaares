@@ -41,13 +41,9 @@ class Route:
         return r
 
 
-def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
-    """Times a scout tour. Returns (feasible, end time, energy Wh, observation end times)."""
+def _forward_at(W: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: float, epm: float):
     n = len(cidx)
-    if n == 0:
-        return True, 0.0, 0.0, []
     C = W.cands
-    v = s.v_model
     dwell = W.rules.obs_dwell_s
     c0 = C[cidx[0]]
     arr = s.climb_t + legs[0] / v
@@ -58,13 +54,18 @@ def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
     if t > c0.latest_end:
         return False, 0.0, 0.0, None
     ends = [t]
-    wait = 0.0
+    # a wait is flown as a slower leg (the realiser stretches the leg), which costs
+    # p0*D + k*L^2/D instead of cruising then hovering
+    slow_extra = 0.0
+    p0, kv = s.p0, s.kv
     for i in range(1, n):
         c = C[cidx[i]]
-        arr = t + legs[i] / v
+        L = legs[i]
+        arr = t + L / v
         lo = c.lo + 0.05
         if arr < lo:
-            wait += lo - arr
+            D = lo - t
+            slow_extra += (p0 * D + kv * L * L / D) / 3600.0 - epm * L
             arr = lo
         t = arr + dwell
         if t > c.latest_end:
@@ -76,10 +77,27 @@ def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
     dist = 0.0
     for l in legs:
         dist += l
-    energy = s.fixed_wh + s.e_per_m * dist + s.hover * (wait + dwell * n)
-    if energy > s.usable:
-        return False, 0.0, 0.0, None
+    energy = s.fixed_wh + epm * dist + slow_extra + s.hover * dwell * n
     return True, end - start, energy, ends
+
+
+def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
+    """Times a scout tour. Returns (feasible, end time, energy Wh, observation end times).
+
+    Flown at full speed when the battery allows; otherwise at the best-range speed v*
+    (minimum energy per metre), if the windows still hold at that speed.
+    """
+    if not cidx:
+        return True, 0.0, 0.0, []
+    ok, end, energy, ends = _forward_at(W, s, cidx, legs, s.v_model, s.e_per_m)
+    if ok and energy <= s.usable:
+        return True, end, energy, ends
+    if s.v_eco >= s.v_model - 1e-9:
+        return False, 0.0, 0.0, None
+    ok, end, energy, ends = _forward_at(W, s, cidx, legs, s.v_eco, s.e_per_m_eco)
+    if ok and energy <= s.usable:
+        return True, end, energy, ends
+    return False, 0.0, 0.0, None
 
 
 def refresh(W: World, r: Route) -> bool:

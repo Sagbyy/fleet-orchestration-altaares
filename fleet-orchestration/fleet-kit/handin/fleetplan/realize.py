@@ -226,7 +226,8 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     for i in range(n - 1, -1, -1):
         latest[i] = min(wins[i][1], nxt) - dwell
         nxt = latest[i] - fast[i]
-    t0 = max(0.0, max(fast[0], wins[0][0]) - fast[0] + delta)
+    # take off early enough to fly the first leg at the best-range speed when the window allows
+    t0 = max(0.0, max(slow[0], wins[0][0]) - slow[0] + delta)
     wps = [_wp(t0, s.home[0], s.home[1], 0.0)]
     t = t0
     ends: Dict[int, float] = {}
@@ -256,19 +257,24 @@ SCOUT_DELTAS = (0.0, 1.0, 2.0, 3.0, 4.5, 6.0, 8.0, 10.0, 13.0, 17.0, 22.0, 30.0,
                 -1.5, -3.0, -6.0, -10.0, -15.0, -25.0)
 LAND_DELAYS = (0.0, 1.5, 3.0, 4.5, 6.0, 8.0, 11.0, 15.0, 20.0, 30.0)
 LAND_SLOW = (1.0, 0.0, 0.5)   # 1 = slow best-range return (lands late), 0 = full-speed return
+MIN_TRIES = 60                # variants always tried per tour, whatever the clock says
 
 
 def _try_place(W: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: float, cache: dict,
                accept=None):
     """Searches a conflict-free variant of one tour on scout s. Returns (Item, ends) or None.
 
-    `accept(item, ends)` can veto a variant (used when rebuilding a committed scout)."""
+    `accept(item, ends)` can veto a variant (used when rebuilding a committed scout).
+    Past the deadline it still tries a minimum number of variants: a tour must never be
+    abandoned just because the machine is slow."""
+    tries = 0
     for slow in LAND_SLOW:
         for z in SCOUT_Z:
             for land in LAND_DELAYS:
                 feasible_any = False
                 for delta in SCOUT_DELTAS:
-                    if time.monotonic() > deadline:
+                    tries += 1
+                    if tries > MIN_TRIES and time.monotonic() > deadline:
                         return None
                     wps, info = build_scout(W, s, cidx, pts, z, delta, land, cache, land_slow=slow)
                     if wps is None:
@@ -317,15 +323,13 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
     for r in order:
         cidx, pts = list(r.cands), list(r.pts)
         while cidx:
-            if time.monotonic() > deadline:
-                break
             placed = _try_place(W, r.s, cidx, pts, air, deadline, caches[r.s.id])
             if placed:
                 commit(placed, r.s)
                 break
             # same tour on a free scout, farthest pad first
             hit = None
-            for fs in sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1])):
+            for fs in ([] if time.monotonic() > deadline else sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1]))):
                 placed = _try_place(W, fs, cidx, pts, air, deadline, caches.setdefault(fs.id, {}))
                 if placed:
                     hit = fs
@@ -336,7 +340,8 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
                 break
             # surgical trim: remove the single cheapest contact whose removal lets the tour fit
             done = False
-            for k in sorted(range(len(cidx)), key=lambda i: W.cands[cidx[i]].value):
+            for k in ([] if time.monotonic() > deadline else
+                      sorted(range(len(cidx)), key=lambda i: W.cands[cidx[i]].value)):
                 c2, p2 = cidx[:k] + cidx[k + 1:], pts[:k] + pts[k + 1:]
                 if not c2:
                     break
@@ -466,6 +471,7 @@ def place_group(W: World, air: Airspace, c: Cand, T_base: float, members: List[E
         return built[key]
 
     last = len(EFF_Z) - 1
+    tries = 0
     for cap in range(len(EFF_Z)):
         layers = EFF_Z[:cap + 1]
         dts = DTS if cap == last else DTS[:6]
@@ -475,7 +481,8 @@ def place_group(W: World, air: Airspace, c: Cand, T_base: float, members: List[E
             if T + GROUP_DT * (n - 1) > t_hi:
                 break
             for ang0 in angs:
-                if time.monotonic() > deadline:
+                tries += 1
+                if tries > MIN_TRIES and time.monotonic() > deadline:
                     return None
                 items: List[Item] = []
                 ok = True

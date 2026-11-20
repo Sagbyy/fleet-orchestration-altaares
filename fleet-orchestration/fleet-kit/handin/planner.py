@@ -23,7 +23,7 @@ except ImportError:
 from fleetkit.model import Scenario, load_json, save_json  # noqa: E402
 from fleetkit.scorer import evaluate  # noqa: E402
 
-HARD_LIMIT = 55.0  # the evaluation kills runs at 60 s
+HARD_LIMIT = float(os.environ.get("FLEET_HARD_LIMIT", "55"))  # the evaluation kills runs at 60 s
 
 
 def plan_for(data: dict, budget: float, use_baseline: bool = True, log=None, verify: bool = False):
