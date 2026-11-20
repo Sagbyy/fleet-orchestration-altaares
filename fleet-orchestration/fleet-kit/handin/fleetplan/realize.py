@@ -17,6 +17,7 @@ from fleetkit.model import Waypoint
 from .sepcheck import separation_item, separation_violation
 
 from .alns import Sol, match
+from .hungarian import INF, assign
 from .geom import CHECK_MARGIN, free_point, path2d
 from .world import EFF_Z, GROUP_DT, OBS_RHO_HIGH, SCOUT_Z, SCOUT_Z_MODEL, V_SAFE, Cand, EffInfo, ScoutInfo, World, dive_geometry, \
     effector_estimate
@@ -406,6 +407,53 @@ def _fastest_members(W: World, j: int, free: set, t_hi: float):
     return out
 
 
+def hungarian_assign(W: World, chosen: List[int], obs_end: Dict[int, float], free: set):
+    """Energy-optimal effector assignment for a chosen set of hostiles (Hungarian, per subtype).
+
+    A pair is allowed only if the effector arrives before the contact's latest engagement time.
+    Contacts that cannot get their full set (all-or-nothing) are dropped, least valuable first,
+    and the assignment is solved again. Returns {contact idx: (T, effector ks)}.
+    """
+    r = W.rules
+    C = W.cands
+    chosen = sorted(chosen, key=lambda j: -C[j].value)
+
+    def window(j):
+        c = C[j]
+        return (max(obs_end[j] + r.confirm_margin_s + 0.5, c.lo + 0.05),
+                c.hi - GROUP_DT * (c.n_eff - 1) - 0.5)
+
+    while chosen:
+        members: Dict[int, List[int]] = {j: [] for j in chosen}
+        failed = None
+        for sub in sorted({s for j in chosen for s in C[j].needs}):
+            slots = [j for j in chosen for _ in range(C[j].needs.get(sub, 0))]
+            cols = [e for e in W.effs if e.sub == sub and e.k in free]
+            if len(slots) > len(cols):
+                failed = min((j for j in chosen if C[j].needs.get(sub)), key=lambda j: C[j].value)
+                break
+            cost = []
+            for j in slots:
+                t_hi = window(j)[1] - 2.0
+                cost.append([e.energy[j] if e.earliest.get(j, INF) <= t_hi else INF for e in cols])
+            res = assign(cost)
+            bad = [j for j, col in zip(slots, res) if col is None]
+            if bad:
+                failed = min(bad, key=lambda j: C[j].value)
+                break
+            for j, col in zip(slots, res):
+                members[j].append(cols[col].k)
+        if failed is None:
+            out = {}
+            for j, ks in members.items():
+                t_lo, t_hi = window(j)
+                T = min(t_hi, max(t_lo, max(W.effs[k].earliest[j] for k in ks) + 1.0))
+                out[j] = (T, ks)
+            return out
+        chosen.remove(failed)
+    return {}
+
+
 def place_effectors(W: World, air: Airspace, obs_end: Dict[int, float], deadline: float):
     """Matches effectors to observed hostiles and realises each engagement group."""
     r = W.rules
@@ -421,6 +469,13 @@ def place_effectors(W: World, air: Airspace, obs_end: Dict[int, float], deadline
         served, _ = match(W, todo, free)
         if not served:
             break
+        # same contacts, energy-optimal effectors (falls back to the greedy choice if it fails)
+        try:
+            opt = hungarian_assign(W, list(served), obs_end, free)
+            if set(opt) == set(served):
+                served = opt
+        except Exception:
+            pass
         progress = False
         for j in sorted(served, key=lambda jj: -W.cands[jj].value):
             T, ks = served[j]

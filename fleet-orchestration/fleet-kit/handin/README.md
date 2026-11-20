@@ -80,6 +80,17 @@ energy. In L4 the limits are scout battery and time to reach far contacts before
 Paired comparison on seeds 1000-1039 (160 scenarios, 10 s): +5.2 % overall, +7.8 % on L4.
 Official-style run (check_handin, seeds 0-1): 4898 vs 4498 before, 0 failures, L4 in 39 s.
 
+## Round 3
+
+- Hungarian algorithm (fleetplan/hungarian.py, checked against brute force) for the final
+  effector assignment: same contacts, minimum energy, arrival deadlines as hard constraints
+- contact ordering by value per effector tested (FLEET_MATCH_ORDER=density): +1.9 % then -1.5 %
+  on two seed sets, within noise, so value ordering is kept
+- finer R8 repair not built: the validator-driven repair never triggered on 160 scenarios
+
+Paired on seeds 1000-1039 (160 scenarios, 10 s): +6.3 % over the first version, x1.85 vs baseline
+(L4 +9.4 %, x2.63). Validation set: 4937 vs 2665 for the baseline.
+
 ## Parameter tuning
 
 Swept on L3/L4 seeds 0–9 (10 s budget): `time_price`, `regret_w`, `q_frac`, `t0_frac`, `k_routes`.

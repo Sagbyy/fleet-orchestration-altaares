@@ -7,6 +7,7 @@ observation, so every evaluated solution runs the effector matching.
 from __future__ import annotations
 
 import math
+import os
 import random
 import time
 from typing import Dict, List, Optional, Tuple
@@ -158,6 +159,15 @@ class Sol:
         return self.obj
 
 
+MATCH_ORDER = os.environ.get("FLEET_MATCH_ORDER", "value")
+
+
+def _match_key(C):
+    if MATCH_ORDER == "density":     # value per effector consumed: favours cheap contacts when effectors are scarce
+        return lambda h: -C[h[0]].value / max(1, C[h[0]].n_eff)
+    return lambda h: -C[h[0]].value
+
+
 def match(W: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = None):
     """Greedy effector matching: richest contacts first, slowest effector that still makes it."""
     r = W.rules
@@ -165,7 +175,7 @@ def match(W: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = No
     used = set()
     served: Dict[int, Tuple[float, List[int]]] = {}
     total = 0.0
-    for j, oe in sorted(hostiles, key=lambda h: -C[h[0]].value):
+    for j, oe in sorted(hostiles, key=_match_key(C)):
         c = C[j]
         t_lo = max(oe + r.confirm_margin_s + 0.5, c.lo + 0.05)
         t_hi = c.hi - GROUP_DT * (c.n_eff - 1) - 0.5

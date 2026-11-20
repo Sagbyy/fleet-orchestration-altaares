@@ -22,7 +22,7 @@ _PAIR = re.compile(r"^(\S+) and (\S+) come within")
 
 
 def repair_until_valid(sc: Scenario, routes: Dict[str, List[dict]], groups: Dict[str, List[str]],
-                       max_rounds: int = 40):
+                       max_rounds: int = 40, log: Optional[dict] = None):
     """Drops whatever the official validator complains about until the plan is valid."""
     types = {a.id: a.type for a in sc.aircraft}
     eff_target = {e: c for c, es in groups.items() for e in es}
@@ -30,6 +30,8 @@ def repair_until_valid(sc: Scenario, routes: Dict[str, List[dict]], groups: Dict
         res = evaluate(sc, _plan(sc, routes))
         if res.valid:
             return routes, res
+        if log is not None:
+            log.setdefault("repair_rules", []).extend(v.rule for v in res.violations)
         drop_aircraft, drop_contacts = set(), set()
         for v in res.violations:
             ids = []
@@ -220,7 +222,7 @@ def solve(sc: Scenario, t_start: float, budget: float, log: Optional[dict] = Non
     prune_scouts(W, best, air, routes, groups, t_real)
     if verify:
         log["verify_visits"] = verify_pass(W, air, routes, groups, t_start + budget * 0.97)
-    routes, res = repair_until_valid(sc, routes, groups)
+    routes, res = repair_until_valid(sc, routes, groups, log=log)
     log["served"] = len(res.served) if res.valid else 0
     if not res.valid:
         return None, 0.0
