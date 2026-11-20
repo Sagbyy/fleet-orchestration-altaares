@@ -14,11 +14,11 @@ from fleetkit.energy import best_range_speed, route_energy_wh
 from fleetkit.geometry import INF, segment_enters_cylinder
 from fleetkit.model import Route as KRoute
 from fleetkit.model import Waypoint
-from fleetkit.validator import separation_item, separation_violation
+from .sepcheck import separation_item, separation_violation
 
 from .alns import Sol, match
 from .geom import CHECK_MARGIN, free_point, path2d
-from .world import EFF_Z, GROUP_DT, SCOUT_Z, V_SAFE, Cand, EffInfo, ScoutInfo, World, dive_geometry, \
+from .world import EFF_Z, GROUP_DT, OBS_RHO_HIGH, SCOUT_Z, SCOUT_Z_MODEL, V_SAFE, Cand, EffInfo, ScoutInfo, World, dive_geometry, \
     effector_estimate
 
 SPREAD = (0.0, 35.0, -35.0, 70.0, -70.0, 105.0)
@@ -86,6 +86,87 @@ class Airspace:
 
 # ---- scouts ----------------------------------------------------------------------------------
 
+def _seg_min(a, b, ac, vh: float) -> float:
+    """Minimum duration of a straight 3D segment for this aircraft (horizontal speed vh)."""
+    t = math.hypot(b[0] - a[0], b[1] - a[1]) / vh
+    dz = b[2] - a[2]
+    if dz > 0:
+        t = max(t, dz / (V_SAFE * ac.v_up_mps))
+    elif dz < 0:
+        t = max(t, -dz / (V_SAFE * ac.v_down_mps))
+    return t
+
+
+def _leg_min(start, pts3, ac, vh: float) -> float:
+    total, cur = 0.0, start
+    for q in pts3:
+        total += _seg_min(cur, q, ac, vh)
+        cur = q
+    return total
+
+
+def _emit3(wps: List[dict], start, pts3, t_dep: float, t_arr: float, ac) -> None:
+    """Appends a 3D polyline leg flown from t_dep to t_arr; each segment gets its minimum time
+    (at the speed limits) scaled up uniformly, so no segment ever exceeds a limit."""
+    mins, cur = [], start
+    for q in pts3:
+        mins.append(_seg_min(cur, q, ac, V_SAFE * ac.v_h_mps))
+        cur = q
+    m = sum(mins)
+    d = t_arr - t_dep
+    t = t_dep
+    for q, mk in zip(pts3, mins):
+        t += (mk * d / m) if m > 1e-12 else d / len(pts3)
+        wps.append(_wp(t, q[0], q[1], q[2]))
+    wps[-1]["t"] = t_arr
+
+
+def _clear3(a, b, W: World) -> bool:
+    """True if a (possibly sloped) segment stays out of every zone and protected area."""
+    for cc in W.protected + W.zones:
+        if segment_enters_cylinder(a, b, (cc.cx, cc.cy), cc.r + CHECK_MARGIN, cc.top):
+            return False
+    return True
+
+
+def _point_along(start, seq, dist):
+    """Point at arc length `dist` along the polyline start -> seq (2D); None past the end."""
+    cur = start
+    for q in seq:
+        l = math.hypot(q[0] - cur[0], q[1] - cur[1])
+        if dist < l - 1e-6:
+            f = dist / l
+            return (cur[0] + f * (q[0] - cur[0]), cur[1] + f * (q[1] - cur[1]))
+        dist -= l
+        cur = q
+    return None
+
+
+def _climb_leg(W: World, home, seq, z: float, ac, vh: float):
+    """3D points of a leg that takes off from home (z = 0): diagonal climb when clear, else vertical."""
+    dist_c = vh * z / (V_SAFE * ac.v_up_mps)
+    p = _point_along(home, seq[:1], dist_c)   # only on the first segment, to keep the order
+    pts = ([(p[0], p[1], z)] if p is not None else []) + [(q[0], q[1], z) for q in seq]
+    if _clear3((home[0], home[1], 0.0), pts[0], W):
+        return pts
+    return [(home[0], home[1], z)] + [(q[0], q[1], z) for q in seq]
+
+
+def _landing_leg(W: World, start, seq, z: float, ac, vh: float):
+    """3D points of a leg that ends landed at seq[-1]: diagonal descent when clear, else vertical."""
+    home = seq[-1]
+    rev = list(reversed([start] + list(seq[:-1])))
+    dist_d = vh * z / (V_SAFE * ac.v_down_mps)
+    q = _point_along(home, rev[:1], dist_d)   # only on the last segment, to keep the order
+    body = [(p[0], p[1], z) for p in seq[:-1]]
+    if q is not None:
+        body = body + [(q[0], q[1], z)]
+    last_from = body[-1] if body else (start[0], start[1], z)
+    if _clear3(last_from, (home[0], home[1], 0.0), W):
+        return body + [(home[0], home[1], 0.0)]
+    return [(p[0], p[1], z) for p in seq[:-1]] + [(home[0], home[1], z), (home[0], home[1], 0.0)]
+
+
 def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: float,
                 land_delay: float, paths_cache: dict, wins=None):
     """Returns (waypoints, first obs end per contact) or (None, index of the first failing contact).
@@ -98,12 +179,23 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     wins = [w if w is not None else (W.cands[j].lo + 0.05, W.cands[j].latest_end) for j, w in zip(cidx, wins)]
     ac = s.ac
     circles = W.circles_at(z)
+    C = W.cands
+    if z > SCOUT_Z_MODEL + 1e-9:   # higher layer: observation points must be closer to the contact
+        moved = []
+        for j, p in zip(cidx, pts):
+            c = C[j]
+            dx, dy = p[0] - c.x, p[1] - c.y
+            d = math.hypot(dx, dy)
+            if d > OBS_RHO_HIGH:
+                p = (c.x + dx / d * OBS_RHO_HIGH, c.y + dy / d * OBS_RHO_HIGH)
+                if not free_point(p[0], p[1], circles, 3.0):
+                    return None, len(moved)
+            moved.append(p)
+        pts = moved
     v = V_SAFE * ac.v_h_mps
-    climb_t = z / (V_SAFE * ac.v_up_mps) + 0.1
-    land_t = z / (V_SAFE * ac.v_down_mps) + 0.1
     dwell = W.rules.obs_dwell_s
     nodes = [s.home] + list(pts) + [s.home]
-    paths = []
+    legs3 = []
     for i in range(len(nodes) - 1):
         key = (nodes[i], nodes[i + 1], z)
         res = paths_cache.get(key)
@@ -112,66 +204,50 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
             paths_cache[key] = res if res is not None else False
         if not res:
             return None, min(i, len(cidx) - 1)
-        paths.append(res)
-    C = W.cands
+        seq = res[1]
+        if i == 0:
+            p3 = _climb_leg(W, s.home, seq, z, ac, v)
+        elif i == len(nodes) - 2:
+            p3 = _landing_leg(W, nodes[i], seq, z, ac, v)
+        else:
+            p3 = [(q[0], q[1], z) for q in seq]
+        legs3.append(p3)
     n = len(cidx)
+    starts = [(s.home[0], s.home[1], 0.0)] + [legs3[i][-1] for i in range(n)]
+    fast = [_leg_min(starts[i], legs3[i], ac, v) for i in range(n + 1)]
+    v_pref = min(v, max(best_range_speed(ac.power), 0.6 * v))
+    slow = [_leg_min(starts[i], legs3[i], ac, v_pref) for i in range(n + 1)]
     # latest arrival at each observation (backward pass at full speed), so that flying slower
     # (closer to the best-range speed) never breaks a later window or the horizon
     latest = [0.0] * n
-    nxt = W.horizon - 0.5 - land_t - land_delay - paths[n][0] / v
+    nxt = W.horizon - 0.5 - land_delay - fast[n]
     for i in range(n - 1, -1, -1):
         latest[i] = min(wins[i][1], nxt) - dwell
-        nxt = latest[i] - paths[i][0] / v
-    v_pref = min(v, max(best_range_speed(ac.power), 0.6 * v))
-    arr0 = climb_t + paths[0][0] / v
-    t0 = max(0.0, max(arr0, wins[0][0]) - arr0 + delta)
-    wps = [_wp(t0, s.home[0], s.home[1], 0.0), _wp(t0 + climb_t, s.home[0], s.home[1], z)]
-    t = t0 + climb_t
-    cur = s.home
+        nxt = latest[i] - fast[i]
+    t0 = max(0.0, max(fast[0], wins[0][0]) - fast[0] + delta)
+    wps = [_wp(t0, s.home[0], s.home[1], 0.0)]
+    t = t0
     ends: Dict[int, float] = {}
     for i, j in enumerate(cidx):
         c = C[j]
-        L, seq = paths[i]
-        a = max(t + L / v, wins[i][0])
+        a = max(t + fast[i], wins[i][0])
         if i > 0:
-            a = max(a, min(t + L / v_pref, latest[i]))
+            a = max(a, min(t + slow[i], latest[i]))
         if a + dwell > wins[i][1] + 1e-9 or a > latest[i] + 1e-9:
             return None, i
-        _emit_leg(wps, cur, seq, t, a, z)
+        _emit3(wps, starts[i], legs3[i], t, a, ac)
         wps[-1].update(action="observe", target=c.id, dwell_s=dwell)
         t = a + dwell
         if j not in ends:
             ends[j] = t
-        cur = seq[-1]
-    L, seq = paths[-1]
-    a = t + L / v + land_delay
-    a = max(a, min(t + L / v_pref + land_delay, W.horizon - 0.5 - land_t))
-    _emit_leg(wps, cur, seq, t, a, z)
-    t_end = a + land_t
-    if t_end > W.horizon - 0.5:
+    a = t + fast[n] + land_delay
+    a = max(a, min(t + slow[n] + land_delay, W.horizon - 0.5))
+    if a > W.horizon - 0.5 + 1e-9:
         return None, len(cidx) - 1
-    wps.append(_wp(t_end, s.home[0], s.home[1], 0.0))
+    _emit3(wps, starts[n], legs3[n], t, a, ac)
     if route_energy_wh(_to_route(s.id, wps).waypoints, ac) > ac.usable_wh - 0.05:
         return None, len(cidx) - 1
     return wps, ends
-
-
-def _emit_leg(wps: List[dict], start, seq, t_dep: float, t_arr: float, z: float) -> None:
-    """Appends the waypoints of a polyline leg, with times proportional to length."""
-    total = 0.0
-    lens = []
-    cur = start
-    for q in seq:
-        l = math.hypot(q[0] - cur[0], q[1] - cur[1])
-        lens.append(l)
-        total += l
-        cur = q
-    acc = 0.0
-    for q, l in zip(seq, lens):
-        acc += l
-        t = t_arr if total <= 1e-9 else t_dep + (t_arr - t_dep) * acc / total
-        wps.append(_wp(t, q[0], q[1], z))
-    wps[-1]["t"] = t_arr
 
 
 SCOUT_DELTAS = (0.0, 4.0, -4.0, 8.0, -8.0, 15.0, -15.0, 25.0, -25.0, 40.0)
@@ -248,19 +324,20 @@ def build_effector(W: World, e: EffInfo, c: Cand, T: float, z: float, ang: float
     if not res:
         return None
     Lc, seq = res
-    climb_t = z / (V_SAFE * ac.v_up_mps) + 0.1
     vmax = V_SAFE * ac.v_h_mps
     vc = min(best_range_speed(ac.power), vmax)
-    t_cruise = Lc / vc
-    t0 = T - dive_t - t_cruise - climb_t
+    home3 = (hx, hy, 0.0)
+    pts3 = _climb_leg(W, e.home, seq, z, ac, vmax) + [(c.x, c.y, 0.0)]
+    t_fast = _leg_min(home3, pts3, ac, vmax)
+    t_pref = _leg_min(home3, pts3, ac, vc)
+    t0 = T - t_pref
     if t0 < 0.0:
-        t_cruise = T - dive_t - climb_t
-        if t_cruise < Lc / vmax - 1e-9:
+        if T < t_fast - 1e-9:
             return None
         t0 = 0.0
-    wps = [_wp(t0, hx, hy, 0.0), _wp(t0 + climb_t, hx, hy, z)]
-    _emit_leg(wps, e.home, seq, t0 + climb_t, T - dive_t, z)
-    wps.append(_wp(T, c.x, c.y, 0.0, action="engage", target=c.id))
+    wps = [_wp(t0, hx, hy, 0.0)]
+    _emit3(wps, home3, pts3, t0, T, ac)
+    wps[-1].update(action="engage", target=c.id)
     if route_energy_wh(_to_route(e.id, wps).waypoints, ac) > ac.usable_wh - 0.05:
         return None
     return wps
@@ -272,37 +349,66 @@ ANGLES = (0.0, 25.0, -25.0, 50.0, -50.0, 80.0, -80.0)
 
 def place_group(W: World, air: Airspace, c: Cand, T_base: float, members: List[EffInfo],
                 deadline: float, cache: dict) -> Optional[List[Item]]:
+    """Finds conflict-free routes for one engagement group.
+
+    Variants are tried from the cheapest: low cruise layers first (climbing costs energy), and
+    for each layer cap a few later arrivals and approach angles (waiting on the ground is free)
+    before allowing a higher layer.
+    """
     t_hi = c.hi - 0.3
     n = len(members)
-    for dT in DTS:
-        T = T_base + dT
-        if T + GROUP_DT * (n - 1) > t_hi:
-            break
-        for ang0 in ANGLES:
-            if time.monotonic() > deadline:
-                return None
-            items: List[Item] = []
-            ok = True
-            for i, e in enumerate(members):
-                # every cruise layer, cheapest energy first; keep the first conflict-free one
-                options = []
-                for z in EFF_Z:
-                    wps = build_effector(W, e, c, T + GROUP_DT * i, z, ang0 + SPREAD[i % len(SPREAD)], cache)
-                    if wps is not None:
-                        options.append(Item(e.id, wps, e.ac))
-                options.sort(key=lambda it: it.energy)
-                chosen = next((it for it in options if not air.conflicts(it, items)), None)
-                if chosen is None:
-                    ok = False
-                    break
-                items.append(chosen)
-            if ok:
-                return items
+    built: Dict[tuple, Optional[Item]] = {}
+
+    def option(i, e, T, z, ang):
+        key = (e.k, T, z, ang)
+        if key not in built:
+            wps = build_effector(W, e, c, T + GROUP_DT * i, z, ang + SPREAD[i % len(SPREAD)], cache)
+            built[key] = Item(e.id, wps, e.ac) if wps is not None else None
+        return built[key]
+
+    last = len(EFF_Z) - 1
+    for cap in range(len(EFF_Z)):
+        layers = EFF_Z[:cap + 1]
+        dts = DTS if cap == last else DTS[:6]
+        angs = ANGLES if cap == last else ANGLES[:3]
+        for dT in dts:
+            T = T_base + dT
+            if T + GROUP_DT * (n - 1) > t_hi:
+                break
+            for ang0 in angs:
+                if time.monotonic() > deadline:
+                    return None
+                items: List[Item] = []
+                ok = True
+                for i, e in enumerate(members):
+                    opts = [it for it in (option(i, e, T, z, ang0) for z in layers) if it is not None]
+                    opts.sort(key=lambda it: it.energy)
+                    chosen = next((it for it in opts if not air.conflicts(it, items)), None)
+                    if chosen is None:
+                        ok = False
+                        break
+                    items.append(chosen)
+                if ok:
+                    return items
     return None
+
+
+def _fastest_members(W: World, j: int, free: set, t_hi: float):
+    """Alternative group: the fastest free effectors of each needed subtype."""
+    c = W.cands[j]
+    out = []
+    for sub, n in c.needs.items():
+        pool = sorted((e for e in W.effs if e.sub == sub and e.k in free and j in e.earliest
+                       and e.earliest[j] <= t_hi), key=lambda e: e.earliest[j])
+        if len(pool) < n:
+            return None
+        out.extend(pool[:n])
+    return out
 
 
 def place_effectors(W: World, air: Airspace, obs_end: Dict[int, float], deadline: float):
     """Matches effectors to observed hostiles and realises each engagement group."""
+    r = W.rules
     groups: Dict[str, List[str]] = {}
     free = {e.k for e in W.effs}
     cache: dict = {}
@@ -320,16 +426,28 @@ def place_effectors(W: World, air: Airspace, obs_end: Dict[int, float], deadline
             T, ks = served[j]
             if any(k not in free for k in ks):
                 continue
+            c = W.cands[j]
             members = [W.effs[k] for k in ks]
-            items = place_group(W, air, W.cands[j], T, members, deadline, cache)
-            done.add(j)
+            items = place_group(W, air, c, T, members, deadline, cache)
             if items is None:
+                # retry with the fastest free effectors, which leave more room in the window
+                t_lo = max(obs_end[j] + r.confirm_margin_s + 0.5, c.lo + 0.05)
+                t_hi = c.hi - GROUP_DT * (c.n_eff - 1) - 0.5
+                alt = _fastest_members(W, j, free, t_hi - 2.0)
+                if alt is not None and {e.k for e in alt} != set(ks):
+                    T2 = min(t_hi, max(t_lo, max(e.earliest[j] for e in alt) + 1.0))
+                    items = place_group(W, air, c, T2, alt, deadline, cache)
+                    if items is not None:
+                        ks = [e.k for e in alt]
+            if items is None:
+                done.add(j)          # tried twice: give up on this contact
                 continue
+            done.add(j)
             for it in items:
                 air.commit(it)
             for k in ks:
                 free.discard(k)
-            groups[W.cands[j].id] = [it.aid for it in items]
+            groups[c.id] = [it.aid for it in items]
             progress = True
         if not progress:
             break

@@ -10,10 +10,11 @@ from fleetkit.model import CIVILIAN, EFFECTOR, FRIENDLY, HOSTILE, SCOUT, UNKNOWN
 
 from .geom import Circle, XY, free_point, model_leg
 
-V_SAFE = 0.97          # realised speeds as a fraction of the limits
-OBS_RHO = 125.0        # horizontal offset of an observation point (valid up to z = 70 m)
+V_SAFE = 0.99          # realised speeds as a fraction of the limits
+OBS_RHO = 143.0        # horizontal offset of an observation point at z = 30 m (3D range 146 < 150)
+OBS_RHO_HIGH = 128.0   # max horizontal offset at z = 70 m (3D range 146 < 150)
 SCOUT_Z = (30.0, 70.0)
-SCOUT_Z_MODEL = 70.0
+SCOUT_Z_MODEL = 30.0
 EFF_Z = (30.0, 40.0, 80.0, 110.0, 150.0)   # cruise layers; the cheapest conflict-free one is used
 EFF_Z_MODEL = 150.0                  # conservative layer for earliest-arrival estimates
 EFF_Z_ENERGY = 40.0                  # typical layer for energy estimates
@@ -27,14 +28,16 @@ class ScoutInfo:
         self.home: XY = (ac.home[0], ac.home[1])
         p = ac.power
         self.v_real = V_SAFE * ac.v_h_mps
-        self.v_model = 0.94 * ac.v_h_mps
-        self.climb_t = SCOUT_Z_MODEL / (V_SAFE * ac.v_up_mps) + 0.2
-        self.land_t = SCOUT_Z_MODEL / (V_SAFE * ac.v_down_mps) + 0.2
+        self.v_model = 0.97 * ac.v_h_mps
+        # climb-out and landing are flown diagonally on the first and last legs (R2 only bounds
+        # the altitude of intermediate waypoints), so they cost almost no extra time
+        self.climb_t = 1.0
+        self.land_t = 1.0
         epm = lambda v: (p.p0_w + p.k_v * v * v) / v / 3600.0  # noqa: E731
         self.e_per_m = max(epm(self.v_model), epm(self.v_real))
         self.hover = p.p0_w / 3600.0
         self.fixed_wh = p.e_climb_wh_per_m * SCOUT_Z_MODEL + self.hover * (self.climb_t + self.land_t)
-        self.usable = ac.usable_wh - 0.4
+        self.usable = ac.usable_wh - 0.2
 
 
 class EffInfo:
@@ -57,6 +60,7 @@ class Cand:
         self.latest_end = 0.0
         self.value = 0.0
         self.ring: List[XY] = []
+        self.near: List[Circle] = []     # obstacles that can contain one of its observation points
         self.neighbors: List[int] = []
 
 
@@ -107,6 +111,7 @@ class World:
         homes = [a.home for a in sc.aircraft] or [(0.0, 0.0, 0.0)]
         self.base: XY = (sum(h[0] for h in homes) / len(homes), sum(h[1] for h in homes) / len(homes))
         self.cands: List[Cand] = []
+        self._legs: Dict[tuple, float] = {}
         self._build_cands()
 
     def circles_at(self, z: float) -> List[Circle]:
@@ -141,6 +146,8 @@ class World:
                 continue
             if cand.latest_end - (cand.lo + 0.05) < r.obs_dwell_s:
                 continue
+            cand.near = [cc for cc in self.scout_model_circles
+                         if math.hypot(cc.cx - cand.x, cc.cy - cand.y) < OBS_RHO + cc.wrap + 10.0]
             cand.ring = self._ring(cand)
             if not cand.ring:
                 continue
@@ -222,7 +229,7 @@ class World:
             px, py = cand.x + OBS_RHO, cand.y
         else:
             px, py = cand.x + vx / d * OBS_RHO, cand.y + vy / d * OBS_RHO
-        if free_point(px, py, self.scout_model_circles, 3.0):
+        if free_point(px, py, cand.near, 3.0):
             return (px, py)
         best, bd = cand.ring[0], math.inf
         for (x, y) in cand.ring:
@@ -232,4 +239,11 @@ class World:
         return best
 
     def leg(self, a: XY, b: XY) -> float:
-        return model_leg(a[0], a[1], b[0], b[1], self.scout_model_circles)
+        key = (a, b)
+        v = self._legs.get(key)
+        if v is None:
+            if len(self._legs) > 400000:
+                self._legs.clear()
+            v = model_leg(a[0], a[1], b[0], b[1], self.scout_model_circles)
+            self._legs[key] = v
+        return v

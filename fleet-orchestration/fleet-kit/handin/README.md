@@ -66,6 +66,20 @@ plan.json
 80/80 plans valid. In L1 and L2 the plan already serves every reachable contact; what remains is
 energy. In L4 the limits are scout battery and time to reach far contacts before their window closes.
 
+## Round 2 (after an independent code review)
+
+- baseline computed first (valid fallback in hand), the optimiser gets the rest of the budget
+- scouts and effectors climb and land diagonally (R2 only bounds intermediate waypoints);
+  observation ring 143 m at 30 m, pulled to 128 m when a scout flies at 70 m; speeds at 99 %
+- leg-length cache and bounding-box filters: ~3x more ALNS iterations on L4
+- effector groups: cheapest variants first (low layer, later arrival), retry with the fastest
+  effectors when a group cannot be placed
+- private copy of the official R8 test (no dependency on fleetkit internals)
+- fixed an overflow in the annealing acceptance
+
+Paired comparison on seeds 1000-1039 (160 scenarios, 10 s): +5.2 % overall, +7.8 % on L4.
+Official-style run (check_handin, seeds 0-1): 4898 vs 4498 before, 0 failures, L4 in 39 s.
+
 ## Parameter tuning
 
 Swept on L3/L4 seeds 0–9 (10 s budget): `time_price`, `regret_w`, `q_frac`, `t0_frac`, `k_routes`.

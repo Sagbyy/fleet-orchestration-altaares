@@ -4,7 +4,7 @@ from __future__ import annotations
 from .alns import Params
 
 # Fractions of the time budget at which each phase must be done.
-SHARES = {"alns": 0.75, "realise": 0.92}
+SHARES = {"alns": 0.85, "realise": 0.95}
 
 LEVELS = {
     "L1": dict(k_pos=4, k_routes=4, time_price=0.02, regret_w=1.0, noise=0.2, q_frac=0.5, t0_frac=0.03),

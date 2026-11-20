@@ -23,25 +23,19 @@ except ImportError:
 from fleetkit.model import Scenario, load_json, save_json  # noqa: E402
 from fleetkit.scorer import evaluate  # noqa: E402
 
-BASELINE_COST = {"L1": 0.5, "L2": 1.0, "L3": 3.0, "L4": 12.0}  # rough worst-case seconds
 HARD_LIMIT = 55.0  # the evaluation kills runs at 60 s
 
 
 def plan_for(data: dict, budget: float, use_baseline: bool = True, log=None, verify: bool = False):
-    """Returns (plan, score, source)."""
+    """Returns (plan, score, source).
+
+    The greedy baseline runs first (a few seconds, even on L4), so a valid fallback exists before
+    the optimiser starts; the optimiser then gets the rest of the budget.
+    """
     t0 = time.monotonic()
     sc = Scenario.from_dict(data)
     best, best_score, source = {"seed": sc.seed, "routes": []}, 0.0, "empty"
-    reserve = BASELINE_COST.get(sc.level, 12.0) if use_baseline else 0.0
-    try:
-        from fleetplan.pipeline import solve
-        plan, score = solve(sc, t0, max(3.0, budget - reserve), log, verify=verify)
-        if plan is not None and score > best_score:
-            best, best_score, source = plan, score, "alns"
-    except Exception as exc:  # never crash: fall back
-        if log is not None:
-            log["error"] = repr(exc)
-    if use_baseline and time.monotonic() - t0 + 2.0 * BASELINE_COST.get(sc.level, 12.0) < HARD_LIMIT:
+    if use_baseline:
         try:
             from fleetkit.baseline import greedy_plan
             plan = greedy_plan(sc)
@@ -51,6 +45,16 @@ def plan_for(data: dict, budget: float, use_baseline: bool = True, log=None, ver
         except Exception as exc:
             if log is not None:
                 log["baseline_error"] = repr(exc)
+    remaining = min(budget, HARD_LIMIT) - (time.monotonic() - t0)
+    if remaining > 2.0:
+        try:
+            from fleetplan.pipeline import solve
+            plan, score = solve(sc, time.monotonic(), remaining, log, verify=verify)
+            if plan is not None and score > best_score:
+                best, best_score, source = plan, score, "alns"
+        except Exception as exc:  # never crash: keep the fallback
+            if log is not None:
+                log["error"] = repr(exc)
     return best, best_score, source
 
 

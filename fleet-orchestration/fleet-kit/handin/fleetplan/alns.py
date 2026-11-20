@@ -477,7 +477,7 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
         elif new.obj > cur.obj + 1e-6:
             cur = new
             score = 9.0
-        elif rng.random() < math.exp((new.obj - cur.obj) / temp):
+        elif rng.random() < math.exp(min(0.0, (new.obj - cur.obj) / temp)):
             cur = new
             score = 3.0
         sd[di] += score

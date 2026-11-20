@@ -89,7 +89,18 @@ def model_leg(px: float, py: float, qx: float, qy: float, circles: Sequence[Circ
     """Approximate obstacle-aware length: straight length plus the detour of each blocking obstacle."""
     d = math.hypot(qx - px, qy - py)
     extra = 0.0
+    if px < qx:
+        xmin, xmax = px, qx
+    else:
+        xmin, xmax = qx, px
+    if py < qy:
+        ymin, ymax = py, qy
+    else:
+        ymin, ymax = qy, py
     for c in circles:
+        chk = c.chk
+        if c.cx + chk < xmin or c.cx - chk > xmax or c.cy + chk < ymin or c.cy - chk > ymax:
+            continue
         if blocked(px, py, qx, qy, c):
             opts = _wrap_options(px, py, qx, qy, c)
             if opts is None:
