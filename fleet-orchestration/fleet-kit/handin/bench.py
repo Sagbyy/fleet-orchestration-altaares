@@ -34,7 +34,7 @@ def seeds(text):
 
 
 def run_one(args):
-    level, seed, budget, overrides = args
+    level, seed, budget, overrides, verify = args
     from fleetplan import params
     for k, v in overrides.items():
         params.LEVELS[level][k] = v
@@ -44,13 +44,13 @@ def run_one(args):
     t = time.monotonic()
     log = {}
     try:
-        plan, score = solve(sc, t, budget, log)
+        plan, score = solve(sc, t, budget, log, verify=verify)
         valid = plan is not None and evaluate(sc, plan).valid
     except Exception as exc:  # report, do not hide
         plan, score, valid = None, 0.0, False
         log["error"] = repr(exc)
     took = time.monotonic() - t
-    base = evaluate(sc, greedy_plan(sc)).score
+    base = evaluate(sc, greedy_plan(sc), verify=verify).score
     return level, seed, score if valid else 0.0, base, took, valid, log
 
 
@@ -60,13 +60,14 @@ def main():
     ap.add_argument("--seeds", default="100-104")
     ap.add_argument("--budget", type=float, default=20.0)
     ap.add_argument("--jobs", type=int, default=max(1, (os.cpu_count() or 2) - 2))
+    ap.add_argument("--verify", action="store_true", help="score with the verify bonus")
     ap.add_argument("--set", action="append", default=[], help="param=value override")
     a = ap.parse_args()
     overrides = {}
     for kv in a.set:
         k, v = kv.split("=", 1)
         overrides[k] = float(v) if "." in v else int(v)
-    tasks = [(lv, s, a.budget, overrides) for lv in a.levels.split(",") for s in seeds(a.seeds)]
+    tasks = [(lv, s, a.budget, overrides, a.verify) for lv in a.levels.split(",") for s in seeds(a.seeds)]
     with mp.Pool(a.jobs) as pool:
         results = pool.map(run_one, tasks, chunksize=1)
     per = {}

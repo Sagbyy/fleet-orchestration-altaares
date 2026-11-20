@@ -87,8 +87,15 @@ class Airspace:
 # ---- scouts ----------------------------------------------------------------------------------
 
 def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: float,
-                land_delay: float, paths_cache: dict):
-    """Returns (waypoints, obs end per contact) or (None, index of the first failing contact)."""
+                land_delay: float, paths_cache: dict, wins=None):
+    """Returns (waypoints, first obs end per contact) or (None, index of the first failing contact).
+
+    `wins` optionally gives a (start not before, end not after) window per node, used for
+    verification visits; by default each node uses its contact's window.
+    """
+    if wins is None:
+        wins = [None] * len(cidx)
+    wins = [w if w is not None else (W.cands[j].lo + 0.05, W.cands[j].latest_end) for j, w in zip(cidx, wins)]
     ac = s.ac
     circles = W.circles_at(z)
     v = V_SAFE * ac.v_h_mps
@@ -113,12 +120,11 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     latest = [0.0] * n
     nxt = W.horizon - 0.5 - land_t - land_delay - paths[n][0] / v
     for i in range(n - 1, -1, -1):
-        latest[i] = min(C[cidx[i]].latest_end, nxt) - dwell
+        latest[i] = min(wins[i][1], nxt) - dwell
         nxt = latest[i] - paths[i][0] / v
     v_pref = min(v, max(best_range_speed(ac.power), 0.6 * v))
-    c0 = C[cidx[0]]
     arr0 = climb_t + paths[0][0] / v
-    t0 = max(0.0, max(arr0, c0.lo + 0.05) - arr0 + delta)
+    t0 = max(0.0, max(arr0, wins[0][0]) - arr0 + delta)
     wps = [_wp(t0, s.home[0], s.home[1], 0.0), _wp(t0 + climb_t, s.home[0], s.home[1], z)]
     t = t0 + climb_t
     cur = s.home
@@ -126,15 +132,16 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     for i, j in enumerate(cidx):
         c = C[j]
         L, seq = paths[i]
-        a = max(t + L / v, c.lo + 0.05)
+        a = max(t + L / v, wins[i][0])
         if i > 0:
             a = max(a, min(t + L / v_pref, latest[i]))
-        if a + dwell > c.latest_end + 1e-9 or a > latest[i] + 1e-9:
+        if a + dwell > wins[i][1] + 1e-9 or a > latest[i] + 1e-9:
             return None, i
         _emit_leg(wps, cur, seq, t, a, z)
         wps[-1].update(action="observe", target=c.id, dwell_s=dwell)
         t = a + dwell
-        ends[j] = t
+        if j not in ends:
+            ends[j] = t
         cur = seq[-1]
     L, seq = paths[-1]
     a = t + L / v + land_delay

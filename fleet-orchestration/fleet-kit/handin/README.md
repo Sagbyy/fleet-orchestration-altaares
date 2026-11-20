@@ -66,6 +66,19 @@ plan.json
 80/80 plans valid. In L1 and L2 the plan already serves every reachable contact; what remains is
 energy. In L4 the limits are scout battery and time to reach far contacts before their window closes.
 
+## Parameter tuning
+
+Swept on L3/L4 seeds 0–9 (10 s budget): `time_price`, `regret_w`, `q_frac`, `t0_frac`, `k_routes`.
+L3 is insensitive (the search converges). In L4 a smaller destroy (`q_frac` 0.10–0.15) gained ~2 %
+at 10 s, but at the real budget (33 s) on held-out seeds 100–107 the default 0.25 stayed best
+(10015 vs 9867 vs 9697), so the defaults are kept: tuning on short runs did not carry over.
+
+## Verify board (optional)
+
+`FLEET_VERIFY=1 python3 planner.py ...` adds a scout re-observation 10–120 s after each engagement
+when the +25 % bonus beats the extra energy and the airspace stays clear. It lowers the main score
+slightly, so the hand-in leaves it off. On the 8 validation scenarios: verify score 4861 with it.
+
 ## Tools
 
 ```sh
