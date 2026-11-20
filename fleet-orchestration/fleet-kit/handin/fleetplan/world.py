@@ -14,8 +14,9 @@ V_SAFE = 0.97          # realised speeds as a fraction of the limits
 OBS_RHO = 125.0        # horizontal offset of an observation point (valid up to z = 70 m)
 SCOUT_Z = (30.0, 70.0)
 SCOUT_Z_MODEL = 70.0
-EFF_Z = (150.0, 110.0)
-EFF_Z_MODEL = 150.0
+EFF_Z = (30.0, 40.0, 80.0, 110.0, 150.0)   # cruise layers; the cheapest conflict-free one is used
+EFF_Z_MODEL = 150.0                  # conservative layer for earliest-arrival estimates
+EFF_Z_ENERGY = 40.0                  # typical layer for energy estimates
 GROUP_DT = 3.0         # arrival spacing between effectors of one engagement
 RING_SAMPLES = 48
 
@@ -66,13 +67,18 @@ def dive_geometry(ac: Aircraft, z: float) -> Tuple[float, float]:
     return dd, t
 
 
-def effector_estimate(ac: Aircraft, dist: float, z: float = EFF_Z_MODEL) -> Tuple[float, float]:
-    """Returns (earliest arrival time, energy Wh at cruise speed) for an effector flying `dist` metres."""
+def effector_estimate(ac: Aircraft, dist: float, z_time: float = EFF_Z_MODEL,
+                      z: float = EFF_Z_ENERGY) -> Tuple[float, float]:
+    """Returns (earliest arrival time, energy Wh at cruise speed) for an effector flying `dist` metres.
+
+    The arrival time assumes the highest layer (slowest climb); the energy assumes a low layer.
+    """
     p = ac.power
+    dd_t, dive_tt = dive_geometry(ac, z_time)
+    earliest = z_time / (V_SAFE * ac.v_up_mps) + 0.2 + max(0.0, dist - dd_t) / (V_SAFE * ac.v_h_mps) + dive_tt
     climb_t = z / (V_SAFE * ac.v_up_mps) + 0.2
     dd, dive_t = dive_geometry(ac, z)
     cruise = max(0.0, dist - dd)
-    earliest = climb_t + cruise / (V_SAFE * ac.v_h_mps) + dive_t
     vc = min(best_range_speed(p), V_SAFE * ac.v_h_mps)
     vd = dd / dive_t
     wh = (p.e_climb_wh_per_m * z + p.p0_w * climb_t / 3600.0

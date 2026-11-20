@@ -278,24 +278,26 @@ def place_group(W: World, air: Airspace, c: Cand, T_base: float, members: List[E
         T = T_base + dT
         if T + GROUP_DT * (n - 1) > t_hi:
             break
-        for zpat in ((EFF_Z[0], EFF_Z[1]), (EFF_Z[1], EFF_Z[0])):
-            for ang0 in ANGLES:
-                if time.monotonic() > deadline:
-                    return None
-                items: List[Item] = []
-                ok = True
-                for i, e in enumerate(members):
-                    wps = build_effector(W, e, c, T + GROUP_DT * i, zpat[i % 2], ang0 + SPREAD[i % len(SPREAD)], cache)
-                    if wps is None:
-                        ok = False
-                        break
-                    it = Item(e.id, wps, e.ac)
-                    if air.conflicts(it, items):
-                        ok = False
-                        break
-                    items.append(it)
-                if ok:
-                    return items
+        for ang0 in ANGLES:
+            if time.monotonic() > deadline:
+                return None
+            items: List[Item] = []
+            ok = True
+            for i, e in enumerate(members):
+                # every cruise layer, cheapest energy first; keep the first conflict-free one
+                options = []
+                for z in EFF_Z:
+                    wps = build_effector(W, e, c, T + GROUP_DT * i, z, ang0 + SPREAD[i % len(SPREAD)], cache)
+                    if wps is not None:
+                        options.append(Item(e.id, wps, e.ac))
+                options.sort(key=lambda it: it.energy)
+                chosen = next((it for it in options if not air.conflicts(it, items)), None)
+                if chosen is None:
+                    ok = False
+                    break
+                items.append(chosen)
+            if ok:
+                return items
     return None
 
 
