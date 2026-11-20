@@ -1,0 +1,77 @@
+# ALNS fleet planner
+
+`python3 planner.py scenario.json plan.json` — standard library only, about 30–40 s per scenario,
+always writes a valid plan.
+
+## Pipeline
+
+```
+scenario.json
+   │
+   ▼
+0. Preprocessing (world.py, geom.py)
+   • drop contacts that can never pay: R7 collateral, windows too short, needs the fleet lacks,
+     hostiles whose points do not cover their effectors (10 pts each + energy)
+   • obstacles as circles: protected areas (any altitude) and zones (below their ceiling)
+   • observation ring per contact: points 125 m away, outside every obstacle
+     (valid in 3D up to z = 70 m since √(125² + 70²) < 150 m)
+   • per effector × hostile: earliest arrival and energy at best-range speed
+   │
+   ▼
+1. Construction (alns.py)
+   • regret-2 insertion of observations into scout tours (TOPTW)
+   • exact timing per tour: windows, 20 s dwell, return by the horizon, battery
+   • observation point chosen on the ring where the tour passes (cuts 2×125 m per visit)
+   │
+   ▼
+2. Effector matching (alns.match), on every evaluated solution
+   • richest hostiles first; per subtype, the slowest effector that still arrives in time
+   • engagement time T = max(observation end + 10 s, window start, arrivals), all-or-nothing
+   │
+   ▼
+3. ALNS (alns.run), until ~75 % of the budget or 20k iterations without a new best
+   • destroy: random, worst contribution, related (space + time), whole tour, sector
+   • repair: regret-2, regret-2 with noise, greedy with noise
+   • simulated-annealing acceptance, adaptive operator weights (roulette)
+   │
+   ▼
+4. 3D realisation and deconfliction (realize.py)
+   • scouts at 30 or 70 m, effectors cruise at 150 or 110 m (over every zone at 150 m)
+   • detours around obstacles along circumscribed polygons; final dive from ~250 m out
+   • ground waiting is free: effectors take off just in time, fly at best-range speed
+   • scouts fly legs at best-range speed whenever the next windows allow it
+   • each route is checked against the committed ones with the official R8 test; on conflict,
+     try another altitude, time shift, landing delay or approach angle
+   │
+   ▼
+5. Safety net (pipeline.py, planner.py)
+   • official validator; drop whatever it flags (effector group, scout + dependent groups)
+   • drop scout observations nobody engages, when that stays valid
+   • compare with the greedy baseline and write the better valid plan; never crash
+   │
+   ▼
+plan.json
+```
+
+## Results (public generator, held-out seeds 0–19, 10 s budget)
+
+| Level | Ours | Baseline | Ratio |
+|---|---:|---:|---:|
+| L1 | 2002 | 1920 | ×1.04 |
+| L2 | 5077 | 4554 | ×1.11 |
+| L3 | 9750 | 7710 | ×1.26 |
+| L4 | 22256 | 10578 | ×2.10 |
+| **Total** | **39084** | **24762** | **×1.58** |
+
+80/80 plans valid. In L1 and L2 the plan already serves every reachable contact; what remains is
+energy. In L4 the limits are scout battery and time to reach far contacts before their window closes.
+
+## Tools
+
+```sh
+python3 bench.py --levels L1,L2,L3,L4 --seeds 0-19 --budget 10 --jobs 8   # parallel benchmark
+python3 bench.py --levels L4 --seeds 0-4 --set time_price=0.05             # try a parameter
+python3 check_handin.py                                                   # official-style run
+```
+
+Per-level parameters live in `fleetplan/params.py`. `FLEET_BUDGET` (seconds) overrides the run time.
