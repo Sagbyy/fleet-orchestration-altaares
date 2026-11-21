@@ -16,7 +16,7 @@ OBS_RHO = 146.5        # horizontal offset of an observation point at z = 30 m (
 OBS_RHO_HIGH = 128.0   # max horizontal offset at z = 70 m (3D range 146 < 150)
 SCOUT_Z = (30.0, 70.0)
 SCOUT_Z_MODEL = 30.0
-GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "1") == "1"   # effectors may fly [home, engage] at z = 0
+GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "0") == "1"   # effectors may fly [home, engage] at z = 0
 EFF_Z = ((0.0,) if GROUND_RUN else ()) + (30.0, 40.0, 80.0, 110.0, 150.0)   # cheapest conflict-free layer wins
 EFF_Z_MODEL = 40.0                   # layer for earliest-arrival estimates (most effectors fly low)
 EFF_Z_ENERGY = 40.0                  # typical layer for energy estimates

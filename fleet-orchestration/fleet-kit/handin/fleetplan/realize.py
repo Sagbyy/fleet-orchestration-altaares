@@ -377,7 +377,7 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
 
 # ---- effectors -------------------------------------------------------------------------------
 
-GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "1") == "1"
+GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "0") == "1"
 
 
 def _ground_effector(W: World, e: EffInfo, c: Cand, T: float):
