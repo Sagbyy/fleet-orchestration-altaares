@@ -98,13 +98,6 @@ R2 only bounds the altitude of intermediate waypoints, so a two-waypoint effecto
 That is a loophole, not flight: it is off by default (FLEET_GROUND_RUN=1 re-enables it for
 comparison; worth about +0.4 %). We report it to the organisers instead of exploiting it.
 
-## OR-Tools cross-check (offline, not shipped)
-
-Google OR-Tools routing (guided local search, 60-120 s) on a simplified scout-routing model of
-L4-401 and L4-402 scored only 2-3 % above our ALNS, and its tours became infeasible once replayed
-in our exact timing model (repaired: well below the ALNS). The ALNS tours are close to what an
-industrial solver finds on this problem.
-
 ## Parameter tuning
 
 Swept on L3/L4 seeds 0–9 (10 s budget): `time_price`, `regret_w`, `q_frac`, `t0_frac`, `k_routes`.
