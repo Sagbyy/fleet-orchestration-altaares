@@ -5,3 +5,7 @@ scenario.json
 plan.json
 plan.svg
 .fleetkit-board.json
+
+.env
+.env.*
+!.env.example
