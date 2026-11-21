@@ -15,7 +15,7 @@ from .airspace import Airspace, Item
 from .waypoints import climb_leg, emit_leg, landing_leg, leg_min_time, to_kroute, waypoint
 
 
-def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: float,
+def build_scout(world: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: float,
                 land_delay: float, paths_cache: dict, wins=None, land_slow: float = 1.0):
     """Returns (waypoints, first obs end per contact) or (None, index of the first failing contact).
 
@@ -24,14 +24,14 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     """
     if wins is None:
         wins = [None] * len(cidx)
-    wins = [w if w is not None else (W.cands[j].lo + 0.05, W.cands[j].latest_end) for j, w in zip(cidx, wins)]
+    wins = [w if w is not None else (world.cands[j].lo + 0.05, world.cands[j].latest_end) for j, w in zip(cidx, wins)]
     ac = s.ac
-    circles = W.circles_at(z)
-    C = W.cands
+    circles = world.circles_at(z)
+    cands = world.cands
     if z > SCOUT_Z_MODEL + 1e-9:   # higher layer: observation points must be closer to the contact
         moved = []
         for j, p in zip(cidx, pts):
-            c = C[j]
+            c = cands[j]
             dx, dy = p[0] - c.x, p[1] - c.y
             d = math.hypot(dx, dy)
             if d > OBS_RHO_HIGH:
@@ -41,7 +41,7 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
             moved.append(p)
         pts = moved
     v = V_SAFE * ac.v_h_mps
-    dwell = W.rules.obs_dwell_s
+    dwell = world.rules.obs_dwell_s
     nodes = [s.home] + list(pts) + [s.home]
     legs3 = []
     for i in range(len(nodes) - 1):
@@ -54,9 +54,9 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
             return None, min(i, len(cidx) - 1)
         seq = res[1]
         if i == 0:
-            p3 = climb_leg(W, s.home, seq, z, ac, v)
+            p3 = climb_leg(world, s.home, seq, z, ac, v)
         elif i == len(nodes) - 2:
-            p3 = landing_leg(W, nodes[i], seq, z, ac, v)
+            p3 = landing_leg(world, nodes[i], seq, z, ac, v)
         else:
             p3 = [(q[0], q[1], z) for q in seq]
         legs3.append(p3)
@@ -68,7 +68,7 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     # latest arrival at each observation (backward pass at full speed), so that flying slower
     # (closer to the best-range speed) never breaks a later window or the horizon
     latest = [0.0] * n
-    nxt = W.horizon - 0.5 - land_delay - fast[n]
+    nxt = world.horizon - 0.5 - land_delay - fast[n]
     for i in range(n - 1, -1, -1):
         latest[i] = min(wins[i][1], nxt) - dwell
         nxt = latest[i] - fast[i]
@@ -78,7 +78,7 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     t = t0
     ends: Dict[int, float] = {}
     for i, j in enumerate(cidx):
-        c = C[j]
+        c = cands[j]
         a = max(t + fast[i], wins[i][0])
         if i > 0:
             a = max(a, min(t + slow[i], latest[i]))
@@ -90,8 +90,8 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
         if j not in ends:
             ends[j] = t
     a = t + fast[n] + land_delay
-    a = a + land_slow * max(0.0, min(t + slow[n] + land_delay, W.horizon - 0.5) - a)
-    if a > W.horizon - 0.5 + 1e-9:
+    a = a + land_slow * max(0.0, min(t + slow[n] + land_delay, world.horizon - 0.5) - a)
+    if a > world.horizon - 0.5 + 1e-9:
         return None, len(cidx) - 1
     emit_leg(wps, starts[n], legs3[n], t, a, ac)
     if route_energy_wh(to_kroute(s.id, wps).waypoints, ac) > ac.usable_wh - 0.05:
@@ -99,7 +99,7 @@ def build_scout(W: World, s: ScoutInfo, cidx: List[int], pts, z: float, delta: f
     return wps, ends
 
 
-def try_place(W: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: float, cache: dict,
+def try_place(world: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: float, cache: dict,
                accept=None):
     """Searches a conflict-free variant of one tour on scout s. Returns (Item, ends) or None.
 
@@ -115,7 +115,7 @@ def try_place(W: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: floa
                     tries += 1
                     if tries > MIN_TRIES and clock.now() > deadline:
                         return None
-                    wps, info = build_scout(W, s, cidx, pts, z, delta, land, cache, land_slow=slow)
+                    wps, info = build_scout(world, s, cidx, pts, z, delta, land, cache, land_slow=slow)
                     if wps is None:
                         continue
                     feasible_any = True
@@ -129,16 +129,16 @@ def try_place(W: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: floa
     return None
 
 
-def _launch_slack(W: World, s: ScoutInfo, cidx, pts, cache) -> float:
+def _launch_slack(world: World, s: ScoutInfo, cidx, pts, cache) -> float:
     """How late the scout can take off (s): small = urgent, place it first."""
     for d in (2.0, 6.0, 15.0):
-        wps, _ = build_scout(W, s, cidx, pts, SCOUT_Z[0], d, 0.0, cache)
+        wps, _ = build_scout(world, s, cidx, pts, SCOUT_Z[0], d, 0.0, cache)
         if wps is None:
             return d
     return 99.0
 
 
-def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Optional[dict] = None):
+def place_scouts(world: World, sol: Sol, air: Airspace, deadline: float, log: Optional[dict] = None):
     """Realises and deconflicts every scout. Returns obs end times per contact.
 
     Tours are placed most urgent first (least take-off slack, then least battery margin). A tour
@@ -148,9 +148,9 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
     obs_end: Dict[int, float] = {}
     tours = [r for r in sol.routes if r.cands]
     caches = {r.s.id: {} for r in tours}
-    order = sorted(tours, key=lambda r: (_launch_slack(W, r.s, r.cands, r.pts, caches[r.s.id]),
+    order = sorted(tours, key=lambda r: (_launch_slack(world, r.s, r.cands, r.pts, caches[r.s.id]),
                                          r.s.usable - r.energy))
-    free = [s for s in W.scouts if not any(r.s is s for r in tours)]
+    free = [s for s in world.scouts if not any(r.s is s for r in tours)]
     lost: List[int] = []
 
     def commit(placed, s_used):
@@ -162,14 +162,14 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
     for r in order:
         cidx, pts = list(r.cands), list(r.pts)
         while cidx:
-            placed = try_place(W, r.s, cidx, pts, air, deadline, caches[r.s.id])
+            placed = try_place(world, r.s, cidx, pts, air, deadline, caches[r.s.id])
             if placed:
                 commit(placed, r.s)
                 break
             # same tour on a free scout, farthest pad first
             hit = None
             for fs in ([] if clock.now() > deadline else sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1]))):
-                placed = try_place(W, fs, cidx, pts, air, deadline, caches.setdefault(fs.id, {}))
+                placed = try_place(world, fs, cidx, pts, air, deadline, caches.setdefault(fs.id, {}))
                 if placed:
                     hit = fs
                     break
@@ -180,11 +180,11 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
             # surgical trim: remove the single cheapest contact whose removal lets the tour fit
             done = False
             for k in ([] if clock.now() > deadline else
-                      sorted(range(len(cidx)), key=lambda i: W.cands[cidx[i]].value)):
+                      sorted(range(len(cidx)), key=lambda i: world.cands[cidx[i]].value)):
                 c2, p2 = cidx[:k] + cidx[k + 1:], pts[:k] + pts[k + 1:]
                 if not c2:
                     break
-                placed = try_place(W, r.s, c2, p2, air, deadline, caches[r.s.id])
+                placed = try_place(world, r.s, c2, p2, air, deadline, caches[r.s.id])
                 if placed:
                     lost.append(cidx[k])
                     commit(placed, r.s)
@@ -194,21 +194,21 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
                     break
             if done:
                 break
-            k = min(range(len(cidx)), key=lambda i: W.cands[cidx[i]].value)
+            k = min(range(len(cidx)), key=lambda i: world.cands[cidx[i]].value)
             lost.append(cidx[k])
             cidx.pop(k)
             pts.pop(k)
     # solo rescue: put each lost contact alone on a still-free scout
-    for j in sorted(lost, key=lambda jj: -W.cands[jj].value):
+    for j in sorted(lost, key=lambda jj: -world.cands[jj].value):
         if j in obs_end or not free or clock.now() > deadline:
             continue
-        c = W.cands[j]
+        c = world.cands[j]
         for fs in list(free):
-            p = W.obs_point(c, fs.home, fs.home)
-            placed = try_place(W, fs, [j], [p], air, deadline, caches.setdefault(fs.id, {}))
+            p = world.obs_point(c, fs.home, fs.home)
+            placed = try_place(world, fs, [j], [p], air, deadline, caches.setdefault(fs.id, {}))
             if placed:
                 commit(placed, fs)
                 break
     if log is not None:
-        log["scout_lost"] = [W.cands[j].id for j in lost if j not in obs_end]
+        log["scout_lost"] = [world.cands[j].id for j in lost if j not in obs_end]
     return obs_end

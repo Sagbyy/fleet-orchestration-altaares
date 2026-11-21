@@ -28,11 +28,11 @@ class Item:
 
 
 class Airspace:
-    def __init__(self, W: World):
-        self.W = W
+    def __init__(self, world: World):
+        self.world = world
         self.items: Dict[str, Item] = {}
-        self.contacts = W.sc.contact_by_id()
-        self.d = W.rules.d_sep_m
+        self.contacts = world.sc.contact_by_id()
+        self.d = world.rules.d_sep_m
 
     def conflicts(self, it: Item, extra: List[Item] = ()) -> bool:
         if it.sep is None:
@@ -48,7 +48,7 @@ class Airspace:
             if o[0] > b[1] + d or o[1] < b[0] - d or o[2] > b[3] + d or o[3] < b[2] - d \
                     or o[4] > b[5] + d or o[5] < b[4] - d:
                 continue
-            if separation_violation(self.W.rules, self.contacts, it.sep, other.sep) is not None:
+            if separation_violation(self.world.rules, self.contacts, it.sep, other.sep) is not None:
                 return True
         return False
 

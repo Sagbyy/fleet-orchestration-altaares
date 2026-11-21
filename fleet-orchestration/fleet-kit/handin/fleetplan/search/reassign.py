@@ -11,7 +11,7 @@ from .tour import Route, forward
 INF = math.inf
 
 
-def reassign_tours(W: World, sol: Sol) -> bool:
+def reassign_tours(world: World, sol: Sol) -> bool:
     """Gives each tour to the scout that flies it cheapest (Hungarian on tours x scouts).
 
     Scouts differ in battery, speed and consumption; a long tour on a small-battery scout can
@@ -20,18 +20,18 @@ def reassign_tours(W: World, sol: Sol) -> bool:
     tours = [r for r in sol.routes if r.cands]
     if len(tours) < 1 or len(tours) > len(sol.routes):
         return False
-    lam = W.rules.lambda_e
+    lam = world.rules.lambda_e
     cost, cache = [], {}
     for r in tours:
         row = []
         mid = r.legs[1:-1]
-        for s in W.scouts:
+        for s in world.scouts:
             if s is r.s:
                 row.append(lam * r.energy)
                 cache[(id(r), s.k)] = (r.legs, r.end, r.energy, r.ends)
                 continue
-            legs = [W.leg(s.home, r.pts[0])] + mid + [W.leg(r.pts[-1], s.home)]
-            ok, end, energy, ends = forward(W, s, r.cands, legs)
+            legs = [world.leg(s.home, r.pts[0])] + mid + [world.leg(r.pts[-1], s.home)]
+            ok, end, energy, ends = forward(world, s, r.cands, legs)
             if ok:
                 row.append(lam * energy)
                 cache[(id(r), s.k)] = (legs, end, energy, ends)
@@ -43,7 +43,7 @@ def reassign_tours(W: World, sol: Sol) -> bool:
         return False
     if all(tours[i].s.k == res[i] for i in range(len(tours))):
         return False
-    new_routes = [Route(s) for s in W.scouts]
+    new_routes = [Route(s) for s in world.scouts]
     for i, r in enumerate(tours):
         k = res[i]
         nr = new_routes[k]

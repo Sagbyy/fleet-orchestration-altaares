@@ -33,11 +33,11 @@ class Route:
         return r
 
 
-def _forward_at(W: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: float, epm: float):
+def _forward_at(world: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: float, epm: float):
     n = len(cidx)
-    C = W.cands
-    dwell = W.rules.obs_dwell_s
-    c0 = C[cidx[0]]
+    cands = world.cands
+    dwell = world.rules.obs_dwell_s
+    c0 = cands[cidx[0]]
     arr = s.climb_t + legs[0] / v
     lo = c0.lo + 0.05
     a = arr if arr > lo else lo
@@ -51,7 +51,7 @@ def _forward_at(W: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: f
     slow_extra = 0.0
     p0, kv = s.p0, s.kv
     for i in range(1, n):
-        c = C[cidx[i]]
+        c = cands[cidx[i]]
         L = legs[i]
         arr = t + L / v
         lo = c.lo + 0.05
@@ -64,7 +64,7 @@ def _forward_at(W: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: f
             return False, 0.0, 0.0, None
         ends.append(t)
     end = t + legs[n] / v + s.land_t
-    if end > W.horizon - 2.0:
+    if end > world.horizon - 2.0:
         return False, 0.0, 0.0, None
     dist = 0.0
     for l in legs:
@@ -73,7 +73,7 @@ def _forward_at(W: World, s: ScoutInfo, cidx: List[int], legs: List[float], v: f
     return True, end - start, energy, ends
 
 
-def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
+def forward(world: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
     """Times a scout tour. Returns (feasible, end time, energy Wh, observation end times).
 
     Flown at full speed when the battery allows; otherwise at the best-range speed v*
@@ -81,31 +81,31 @@ def forward(W: World, s: ScoutInfo, cidx: List[int], legs: List[float]):
     """
     if not cidx:
         return True, 0.0, 0.0, []
-    ok, end, energy, ends = _forward_at(W, s, cidx, legs, s.v_model, s.e_per_m)
+    ok, end, energy, ends = _forward_at(world, s, cidx, legs, s.v_model, s.e_per_m)
     if ok and energy <= s.usable:
         return True, end, energy, ends
     if s.v_eco >= s.v_model - 1e-9:
         return False, 0.0, 0.0, None
-    ok, end, energy, ends = _forward_at(W, s, cidx, legs, s.v_eco, s.e_per_m_eco)
+    ok, end, energy, ends = _forward_at(world, s, cidx, legs, s.v_eco, s.e_per_m_eco)
     if ok and energy <= s.usable:
         return True, end, energy, ends
     return False, 0.0, 0.0, None
 
 
-def refresh(W: World, r: Route) -> bool:
-    ok, end, energy, ends = forward(W, r.s, r.cands, r.legs)
+def refresh(world: World, r: Route) -> bool:
+    ok, end, energy, ends = forward(world, r.s, r.cands, r.legs)
     if ok:
         r.end, r.energy, r.ends = end, energy, ends
     return ok
 
 
-def time_tour(W: World, sc: ScoutInfo, cands: List[int], pts: List[XY]):
+def time_tour(world: World, sc: ScoutInfo, cands: List[int], pts: List[XY]):
     """Times a candidate tour on scout sc: (ok, end, energy, ends, legs)."""
     if not cands:
         return True, 0.0, 0.0, [], [0.0]
     nodes = [sc.home] + list(pts) + [sc.home]
-    legs = [W.leg(nodes[i], nodes[i + 1]) for i in range(len(nodes) - 1)]
-    ok, end, energy, ends = forward(W, sc, cands, legs)
+    legs = [world.leg(nodes[i], nodes[i + 1]) for i in range(len(nodes) - 1)]
+    ok, end, energy, ends = forward(world, sc, cands, legs)
     return ok, end, energy, ends, legs
 
 

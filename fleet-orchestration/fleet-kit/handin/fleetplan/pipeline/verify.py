@@ -11,18 +11,18 @@ from ..config import SCOUT_Z
 from ..world import World
 
 
-def verify_pass(W: World, air: Airspace, routes: Dict[str, List[dict]],
+def verify_pass(world: World, air: Airspace, routes: Dict[str, List[dict]],
                 groups: Dict[str, List[str]], deadline: float) -> int:
     """Adds scout re-observations 10-120 s after an engagement (optional --verify bonus).
 
     Only worth it on the verify board: the extra flight costs energy in the main score.
     Returns the number of verification visits added.
     """
-    r = W.rules
+    r = world.rules
     lam = r.lambda_e
     dwell = r.obs_dwell_s
-    by_id = {c.id: c for c in W.cands}
-    scouts = {s.id: s for s in W.scouts}
+    by_id = {c.id: c for c in world.cands}
+    scouts = {s.id: s for s in world.scouts}
     last_T = {cid: max(routes[e][-1]["t"] for e in es) for cid, es in groups.items()}
     first_T = {cid: min(routes[e][-1]["t"] for e in es) for cid, es in groups.items()}
     added = 0
@@ -46,7 +46,7 @@ def verify_pass(W: World, air: Airspace, routes: Dict[str, List[dict]],
             pts = [(w["x"], w["y"]) for w in obs]
             wins = [None] * len(nodes)
             for k, (j, w) in enumerate(zip(nodes, obs)):   # keep existing verification visits in their window
-                cj = W.cands[j]
+                cj = world.cands[j]
                 if cj.id in last_T and w["t"] + dwell > first_T[cj.id] - r.confirm_margin_s:
                     lt = last_T[cj.id]
                     wins[k] = (max(cj.lo + 0.05, lt + r.confirm_margin_s - dwell + 0.3),
@@ -55,20 +55,20 @@ def verify_pass(W: World, air: Airspace, routes: Dict[str, List[dict]],
             for pos in range(len(nodes) + 1):
                 a = s.home if pos == 0 else pts[pos - 1]
                 b = s.home if pos == len(nodes) else pts[pos]
-                p = W.obs_point(c, a, b)
+                p = world.obs_point(c, a, b)
                 n2 = nodes[:pos] + [c.idx] + nodes[pos:]
                 p2 = pts[:pos] + [p] + pts[pos:]
                 w2 = wins[:pos] + [(lo, hi)] + wins[pos:]
                 cache: dict = {}
                 for z in SCOUT_Z:
-                    wps, ends = build_scout(W, s, n2, p2, z, 0.0, 0.0, cache, w2)
+                    wps, ends = build_scout(world, s, n2, p2, z, 0.0, 0.0, cache, w2)
                     if wps is None:
                         continue
                     # every hostile this scout confirms must still be confirmed in time
                     # (`ends` holds the first observation end per contact)
-                    confirmers = [j for j, w in zip(nodes, obs) if W.cands[j].id in first_T
-                                  and w["t"] + dwell <= first_T[W.cands[j].id] - r.confirm_margin_s]
-                    if any(ends[j] > first_T[W.cands[j].id] - r.confirm_margin_s - 0.2 for j in confirmers):
+                    confirmers = [j for j, w in zip(nodes, obs) if world.cands[j].id in first_T
+                                  and w["t"] + dwell <= first_T[world.cands[j].id] - r.confirm_margin_s]
+                    if any(ends[j] > first_T[world.cands[j].id] - r.confirm_margin_s - 0.2 for j in confirmers):
                         continue
                     it = Item(aid, wps, s.ac)
                     net = gain_pts - lam * (it.energy - old.energy)

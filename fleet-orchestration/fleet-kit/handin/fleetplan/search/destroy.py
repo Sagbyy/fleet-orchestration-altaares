@@ -14,18 +14,18 @@ def _routed(sol: Sol) -> List[int]:
     return list(sol.where.keys())
 
 
-def d_random(W, sol, q, rng):
+def d_random(world, sol, q, rng):
     js = _routed(sol)
     rng.shuffle(js)
     return js[:q]
 
 
-def d_worst(W, sol, q, rng):
-    lam = W.rules.lambda_e
+def d_worst(world, sol, q, rng):
+    lam = world.rules.lambda_e
     scored = []
     for k, r in enumerate(sol.routes):
         for pos, j in enumerate(r.cands):
-            c = W.cands[j]
+            c = world.cands[j]
             if c.kind == "u":
                 val = c.points
             else:
@@ -43,18 +43,18 @@ def d_worst(W, sol, q, rng):
     return out
 
 
-def d_related(W, sol, q, rng):
+def d_related(world, sol, q, rng):
     js = _routed(sol)
     if not js:
         return []
     seed = rng.choice(js)
-    s = W.cands[seed]
-    rel = sorted(js, key=lambda j: math.hypot(W.cands[j].x - s.x, W.cands[j].y - s.y)
-                 + 3.0 * abs(W.cands[j].lo - s.lo))
+    s = world.cands[seed]
+    rel = sorted(js, key=lambda j: math.hypot(world.cands[j].x - s.x, world.cands[j].y - s.y)
+                 + 3.0 * abs(world.cands[j].lo - s.lo))
     return rel[:q]
 
 
-def d_route(W, sol, q, rng):
+def d_route(world, sol, q, rng):
     ks = [k for k, r in enumerate(sol.routes) if r.cands]
     rng.shuffle(ks)
     out = []
@@ -65,24 +65,24 @@ def d_route(W, sol, q, rng):
     return out
 
 
-def d_sector(W, sol, q, rng):
+def d_sector(world, sol, q, rng):
     js = _routed(sol)
     if not js:
         return []
-    c0 = W.cands[rng.choice(js)]
-    return sorted(js, key=lambda j: math.hypot(W.cands[j].x - c0.x, W.cands[j].y - c0.y))[:q]
+    c0 = world.cands[rng.choice(js)]
+    return sorted(js, key=lambda j: math.hypot(world.cands[j].x - c0.x, world.cands[j].y - c0.y))[:q]
 
 
-def d_weak_route(W, sol, q, rng):
+def d_weak_route(world, sol, q, rng):
     """Empties the tour with the lowest value per Wh, so its contacts get absorbed by other
     tours: consolidation frees a scout and saves a base round trip."""
-    lam = W.rules.lambda_e
+    lam = world.rules.lambda_e
     busy = [r for r in sol.routes if r.cands]
     if len(busy) < 2:
         return []
 
     def worth(r):
-        v = sum(W.cands[j].value if (W.cands[j].kind == "u" or j in sol.served) else 0.0 for j in r.cands)
+        v = sum(world.cands[j].value if (world.cands[j].kind == "u" or j in sol.served) else 0.0 for j in r.cands)
         return (v - lam * r.energy) / max(1.0, r.energy)
 
     busy.sort(key=worth)

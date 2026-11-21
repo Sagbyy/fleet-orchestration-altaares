@@ -10,15 +10,15 @@ from ..search.solution import Sol
 from ..world import World
 
 
-def prune_scouts(W: World, sol: Sol, air: Airspace, routes: Dict[str, List[dict]],
+def prune_scouts(world: World, sol: Sol, air: Airspace, routes: Dict[str, List[dict]],
                  groups: Dict[str, List[str]], deadline: float) -> None:
     """Rebuilds scouts without the hostile observations nobody engages, when that stays valid.
 
     Works from the realised routes (a tour may fly on another scout than the ALNS planned)."""
     engaged_T = {cid: min(routes[e][-1]["t"] for e in es) for cid, es in groups.items()}
-    by_id = {c.id: c for c in W.cands}
-    scouts = {s.id: s for s in W.scouts}
-    confirm = W.rules.confirm_margin_s
+    by_id = {c.id: c for c in world.cands}
+    scouts = {s.id: s for s in world.scouts}
+    confirm = world.rules.confirm_margin_s
     for aid in [a for a in routes if a in scouts]:
         if clock.now() > deadline:
             break
@@ -36,9 +36,9 @@ def prune_scouts(W: World, sol: Sol, air: Airspace, routes: Dict[str, List[dict]
 
         def ok(it, ends, old=old):
             return it.energy < old.energy and all(
-                ends[j] <= engaged_T[W.cands[j].id] - confirm - 0.2 for j in idx if W.cands[j].id in engaged_T)
+                ends[j] <= engaged_T[world.cands[j].id] - confirm - 0.2 for j in idx if world.cands[j].id in engaged_T)
 
-        placed = try_place(W, scouts[aid], idx, pts, air, deadline, {}, accept=ok)
+        placed = try_place(world, scouts[aid], idx, pts, air, deadline, {}, accept=ok)
         if placed:
             air.commit(placed[0])
             routes[aid] = placed[0].wps

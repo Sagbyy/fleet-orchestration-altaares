@@ -39,40 +39,40 @@ def knapsack_pick(items, cap: Dict[str, int]) -> List[int]:
     return list(max(dp.values(), key=lambda x: x[0])[1])
 
 
-def match(W: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = None):
+def match(world: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = None):
     """Effector matching.
 
     1. pick the best set of hostiles under the effector counts (knapsack when effectors are scarce);
     2. assign effectors earliest-deadline first, the slowest effector that still makes it;
     3. fill the remaining effectors greedily with whatever was left out."""
-    r = W.rules
-    C = W.cands
+    r = world.rules
+    cands = world.cands
     used = set()
     served: Dict[int, Tuple[float, List[int]]] = {}
     total = 0.0
     window = {}
     for j, oe in hostiles:
-        c = C[j]
+        c = cands[j]
         t_lo = max(oe + r.confirm_margin_s + 0.5, c.lo + 0.05)
         t_hi = c.hi - GROUP_DT * (c.n_eff - 1) - 0.5
         if t_lo <= t_hi:
             window[j] = (t_lo, t_hi)
     cap: Dict[str, int] = {}
-    for e in W.effs:
+    for e in world.effs:
         if avail is None or e.k in avail:
             cap[e.sub] = cap.get(e.sub, 0) + 1
-    chosen = knapsack_pick([(j, C[j].value, C[j].needs) for j in window], cap) if SETTINGS.knapsack else []
+    chosen = knapsack_pick([(j, cands[j].value, cands[j].needs) for j in window], cap) if SETTINGS.knapsack else []
     chosen_set = set(chosen)
-    rest = sorted((j for j in window if j not in chosen_set), key=lambda j: -C[j].value)
+    rest = sorted((j for j in window if j not in chosen_set), key=lambda j: -cands[j].value)
     order = sorted(chosen, key=lambda j: window[j][1]) + rest
 
     for j in order:
-        c = C[j]
+        c = cands[j]
         t_lo, t_hi = window[j]
         pick = []
         ok = True
         for sub, n in c.needs.items():
-            pool = [e for e in W.effs if e.sub == sub and e.k not in used
+            pool = [e for e in world.effs if e.sub == sub and e.k not in used
                     and (avail is None or e.k in avail)
                     and e.earliest.get(j, INF) <= t_hi - 2.0]
             if len(pool) < n:

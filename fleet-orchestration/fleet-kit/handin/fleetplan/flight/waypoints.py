@@ -59,9 +59,9 @@ def emit_leg(wps: List[dict], start, pts3, t_dep: float, t_arr: float, ac) -> No
     wps[-1]["t"] = t_arr
 
 
-def segment_clear(a, b, W: World) -> bool:
+def segment_clear(a, b, world: World) -> bool:
     """True if a (possibly sloped) segment stays out of every zone and protected area."""
-    for cc in W.protected + W.zones:
+    for cc in world.protected + world.zones:
         if segment_enters_cylinder(a, b, (cc.cx, cc.cy), cc.r + CHECK_MARGIN, cc.top):
             return False
     return True
@@ -80,17 +80,17 @@ def point_along(start, seq, dist):
     return None
 
 
-def climb_leg(W: World, home, seq, z: float, ac, vh: float):
+def climb_leg(world: World, home, seq, z: float, ac, vh: float):
     """3D points of a leg that takes off from home (z = 0): diagonal climb when clear, else vertical."""
     dist_c = vh * z / (V_SAFE * ac.v_up_mps)
     p = point_along(home, seq[:1], dist_c)   # only on the first segment, to keep the order
     pts = ([(p[0], p[1], z)] if p is not None else []) + [(q[0], q[1], z) for q in seq]
-    if segment_clear((home[0], home[1], 0.0), pts[0], W):
+    if segment_clear((home[0], home[1], 0.0), pts[0], world):
         return pts
     return [(home[0], home[1], z)] + [(q[0], q[1], z) for q in seq]
 
 
-def landing_leg(W: World, start, seq, z: float, ac, vh: float):
+def landing_leg(world: World, start, seq, z: float, ac, vh: float):
     """3D points of a leg that ends landed at seq[-1]: diagonal descent when clear, else vertical."""
     home = seq[-1]
     rev = list(reversed([start] + list(seq[:-1])))
@@ -100,6 +100,6 @@ def landing_leg(W: World, start, seq, z: float, ac, vh: float):
     if q is not None:
         body = body + [(q[0], q[1], z)]
     last_from = body[-1] if body else (start[0], start[1], z)
-    if segment_clear(last_from, (home[0], home[1], 0.0), W):
+    if segment_clear(last_from, (home[0], home[1], 0.0), world):
         return body + [(home[0], home[1], 0.0)]
     return [(p[0], p[1], z) for p in seq[:-1]] + [(home[0], home[1], z), (home[0], home[1], 0.0)]
