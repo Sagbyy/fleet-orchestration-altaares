@@ -22,7 +22,7 @@ from fleetkit.model import EFFECTOR, SCOUT, parse_plan
 
 HORIZON_DEVIATED_S = 6.0   # look-ahead of an aircraft that is off its plan
 IMMINENT_S = 2.0           # what must be safe when nothing is safe over the full horizon
-HORIZON_ON_PLAN_S = 2.0    # an aircraft on its plan only reacts to imminent conflicts
+HORIZON_ON_PLAN_S = 4.0    # an aircraft on its plan only reacts to imminent conflicts
 SAMPLE_S = 0.25
 SEP_MARGIN_M = 10.0        # on top of d_sep (also covers motion between samples)
 ZONE_SOFT_M = 25.0         # keep this far from a known zone edge when looking ahead
@@ -36,6 +36,7 @@ REANNOUNCE_CLOSE_S = 6.0   # and this often when a peer is really close
 REANNOUNCE_CLOSE_M = 300.0
 REFACT_S = 4.0             # resend a confirmation this often...
 REFACT_RANGE_M = 700.0     # ...while an effector still waiting for it is this close
+APPROACH_S = 30.0          # an effector this close (in route time) to its target needs the confirmation soon
 CONFIRM_SLACK_S = 0.5
 MAX_BYTES = 64
 EPS = 1e-6
@@ -337,7 +338,8 @@ class Policy:
         return msg or None
 
     def _facts_to_refresh(self, t):
-        """Confirmations worth repeating: an effector that may still wait for one is near me."""
+        """Confirmations worth repeating: an effector of that target is near me and about to
+        engage (or already waiting). Effectors still far from their target are left alone."""
         out = []
         here = None
         for c in self.known_obs:
@@ -347,7 +349,10 @@ class Policy:
             if window and t > window[1]:
                 continue
             for aid in self.effectors_of.get(c, ()):
-                q = self.tracks[aid].pos_at(t)
+                tr = self.tracks[aid]
+                if tr.clock.end - tr.tau_at(t) > APPROACH_S:
+                    continue
+                q = tr.pos_at(t)
                 if q is None:
                     continue
                 if here is None:
