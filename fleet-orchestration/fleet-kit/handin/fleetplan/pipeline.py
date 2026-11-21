@@ -204,15 +204,26 @@ def solve(sc: Scenario, t_start: float, budget: float, log: Optional[dict] = Non
     t_alns = t_start + min(budget * shares["alns"], budget - 3.0)
     best = alns.run(W, t_alns, P, seed=sc.seed + int(os.environ.get("FLEET_SEED", "0")), log=log)
     t_real = t_start + max(budget * shares["realise"], budget - 1.0)
-    routes, groups, air = realize.realise(W, best, t_real)
-    prune_scouts(W, best, air, routes, groups, t_real)
-    if verify:
-        log["verify_visits"] = verify_pass(W, air, routes, groups, t_start + budget * 0.97)
-    routes, res = repair_until_valid(sc, routes, groups, log=log)
+    # realise several distinct good solutions (each takes well under a second) and keep the
+    # one that scores best once flown: the model and the 3D plan do not rank them identically
+    cands = getattr(best, "elite", None) or [best]
+    best_out = None
+    for i, sol in enumerate(cands):
+        if i > 0 and time.monotonic() > t_real - 1.5:
+            break
+        routes, groups, air = realize.realise(W, sol, t_real)
+        prune_scouts(W, sol, air, routes, groups, t_real)
+        if verify:
+            log["verify_visits"] = verify_pass(W, air, routes, groups, t_start + budget * 0.97)
+        routes, res = repair_until_valid(sc, routes, groups, log=log)
+        score = res.score if res.valid else -1.0
+        if verify and res.valid:
+            score = evaluate(sc, _plan(sc, routes), verify=True).score
+        if best_out is None or score > best_out[0]:
+            best_out = (score, routes, res, i)
+    score, routes, res, pick = best_out
+    log["elite_tried"], log["elite_pick"] = len(cands), pick
     log["served"] = len(res.served) if res.valid else 0
     if not res.valid:
         return None, 0.0
-    plan = _plan(sc, routes)
-    if verify:
-        return plan, evaluate(sc, plan, verify=True).score
-    return plan, res.score
+    return _plan(sc, routes), score
