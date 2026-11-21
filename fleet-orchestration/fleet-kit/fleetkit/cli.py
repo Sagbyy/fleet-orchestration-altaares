@@ -172,8 +172,13 @@ def cmd_validation_set(args) -> int:
 
 
 def cmd_board_login(args) -> int:
+    import getpass
     from .submit import save_config
-    print(f"saved to {save_config(args.server, args.team, args.token)}")
+    token = args.token or getpass.getpass("token (typed text stays hidden): ").strip()
+    if not token:
+        print("no token given")
+        return 1
+    print(f"saved to {save_config(args.server, args.team, token)}")
     return 0
 
 
@@ -289,7 +294,7 @@ def main(argv: Optional[List[str]] = None) -> int:
     p = sub.add_parser("board-login", help="save the server address, your team name and token for `submit`")
     p.add_argument("--server", required=True)
     p.add_argument("--team", required=True)
-    p.add_argument("--token", required=True)
+    p.add_argument("--token", help="your token (leave it out to be asked: it then stays out of your shell history)")
     p.set_defaults(func=cmd_board_login)
     for name, text in (("submit", "send one plan to the live validation board"), ("submit-all", "send every plan of a folder to the live board")):
         p = sub.add_parser(name, help=text)

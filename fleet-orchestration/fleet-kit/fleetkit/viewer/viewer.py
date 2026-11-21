@@ -19,7 +19,7 @@ def render_html(model: Dict[str, Any]) -> str:
     template = (HERE / "template.html").read_text(encoding="utf-8")
     css = (HERE / "style.css").read_text(encoding="utf-8")
     js = (HERE / "app.js").read_text(encoding="utf-8")
-    data = json.dumps(model, separators=(",", ":")).replace("</", "<\\/")
+    data = json.dumps(model, separators=(",", ":")).replace("</", "<\\/").replace("<!--", "\\u003c!--")
     title = html.escape(str(model["meta"]["title"]))
     return template.replace("__TITLE__", title).replace("/*__FONTS__*/", font_face_css()).replace("/*__CSS__*/", css).replace("/*__JS__*/", js).replace("__DATA__", data).replace("__LOGO__", logo_data_uri())
 

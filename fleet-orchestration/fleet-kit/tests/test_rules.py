@@ -335,3 +335,10 @@ def test_r10_engagement_too_far_and_boundary():
     scenario = Scenario.from_dict(exempt_scenario_dict())
     assert violations(scenario, exempt_plan_dict(engage_z=25.0)) == []     # exactly 25 m
     assert "R10" in rules_hit(scenario, exempt_plan_dict(engage_z=25.01))
+
+
+def test_a_huge_integer_in_a_plan_is_a_structural_error_not_a_crash():
+    from fleetkit.model import parse_plan
+    plan = {"seed": 1, "routes": [{"aircraft": "S01", "waypoints": [{"t": 10 ** 400, "x": 0, "y": 0, "z": 50}]}]}
+    routes, errors = parse_plan(plan)
+    assert errors and "finite numbers" in errors[0]

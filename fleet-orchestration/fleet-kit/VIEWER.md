@@ -44,3 +44,4 @@ A layer takes `points` (x, y) or (x, y, label), `lines` (polylines of (x, y)), `
 - Positions are drawn to the metre, and large scenarios are sampled every 2 s, so the page stays small (about 0.4 MB at L3, 1.4 MB at L4).
 - The page is for you and your demo: screenshots and screen recordings of it are welcome.
 - It uses the Alta Ares look: Space Grotesk and Space Mono (SIL Open Font License, embedded so the page stays one offline file; the licences are in `fleetkit/viewer/fonts/`).
+- With the link-loss part: `python3 -m fleetkit view scenario.json plan.json --events events.json --policy handin/policy.py` replays the whole run: the cut, the events, every aircraft's action (hold, return and speed are marked), the messages that were delivered or lost, and the retention.

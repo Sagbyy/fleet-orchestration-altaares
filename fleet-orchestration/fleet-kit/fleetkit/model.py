@@ -169,7 +169,12 @@ class Route:
 
 
 def _num(v: Any) -> bool:
-    return isinstance(v, (int, float)) and not isinstance(v, bool) and math.isfinite(v)
+    if not isinstance(v, (int, float)) or isinstance(v, bool):
+        return False
+    try:
+        return math.isfinite(v)
+    except OverflowError:   # an integer too large for a float
+        return False
 
 
 def parse_plan(d: Any) -> Tuple[Optional[Dict[str, Route]], List[str]]:

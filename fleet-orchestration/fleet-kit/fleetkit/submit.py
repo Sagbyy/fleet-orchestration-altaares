@@ -38,9 +38,12 @@ def load_config() -> Dict[str, str]:
 def save_config(server: str, team: str, token: str) -> Path:
     """Saves the board login in your home folder and returns the file."""
     path = Path(CONFIG_NAMES[1])
-    path.write_text(json.dumps({"server": server.rstrip("/"), "team": team, "token": token}, indent=1) + "\n")
+    text = json.dumps({"server": server.rstrip("/"), "team": team, "token": token}, indent=1) + "\n"
+    fd = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)   # readable by you only, from the first byte
+    with os.fdopen(fd, "w") as fh:
+        fh.write(text)
     try:
-        path.chmod(0o600)
+        path.chmod(0o600)  # also when the file already existed with looser rights
     except OSError:
         pass
     return path

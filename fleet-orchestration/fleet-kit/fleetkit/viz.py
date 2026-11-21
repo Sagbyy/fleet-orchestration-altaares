@@ -1,6 +1,7 @@
 """A dependency-free SVG view of a scenario and, optionally, a plan."""
 from __future__ import annotations
 
+import html
 import math
 from typing import Any, Dict, Optional
 
@@ -46,10 +47,10 @@ def render_svg(scenario: Scenario, plan: Optional[Any] = None, title: str = "") 
     out.append(f'<rect width="{SIZE}" height="{height}" fill="#ffffff"/>')
     out.append(f'<rect x="{MARGIN}" y="{MARGIN}" width="{SIZE - 2 * MARGIN}" height="{SIZE - 2 * MARGIN}" fill="#f7f7f5" stroke="#bbb"/>')
     heading = title or f"{scenario.level}  seed {scenario.seed}"
-    out.append(f'<text x="{MARGIN}" y="26" font-size="15" font-weight="bold">{heading}</text>')
+    out.append(f'<text x="{MARGIN}" y="26" font-size="15" font-weight="bold">{html.escape(str(heading))}</text>')
     for z in scenario.zones:
         out.append(f'<circle cx="{_fmt(px(z.center[0]))}" cy="{_fmt(py(z.center[1]))}" r="{_fmt(z.radius_m * k)}" fill="#e53e3e" fill-opacity="0.15" stroke="#e53e3e"/>')
-        out.append(f'<text x="{_fmt(px(z.center[0]))}" y="{_fmt(py(z.center[1]))}" text-anchor="middle" fill="#9b2c2c">{z.id} (to {z.top_m:g} m)</text>')
+        out.append(f'<text x="{_fmt(px(z.center[0]))}" y="{_fmt(py(z.center[1]))}" text-anchor="middle" fill="#9b2c2c">{html.escape(z.id)} (to {z.top_m:g} m)</text>')
     for c in scenario.contacts:
         x, y = px(c.pos[0]), py(c.pos[1])
         if c.cls in (FRIENDLY, CIVILIAN):
@@ -87,7 +88,7 @@ def render_svg(scenario: Scenario, plan: Optional[Any] = None, title: str = "") 
         else:
             out.append(f'<circle cx="{_fmt(x)}" cy="{_fmt(y)}" r="5" fill="#3182ce"/>')
             label = f"{c.id} civilian"
-        out.append(f'<text x="{_fmt(x + 9)}" y="{_fmt(y + 4)}" fill="#222">{label}</text>')
+        out.append(f'<text x="{_fmt(x + 9)}" y="{_fmt(y + 4)}" fill="#222">{html.escape(label)}</text>')
     lx, ly = SIZE - MARGIN - 170, MARGIN + 14
     legend = [("scout", COLORS["scout"]), ("light effector", COLORS["light"]), ("heavy effector", COLORS["heavy"])]
     for i, (name, col) in enumerate(legend):

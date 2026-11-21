@@ -243,7 +243,7 @@ const TABS = [["aircraft", "Aircraft"], ["contacts", "Contacts"], ["issues", "Is
 if (link) TABS.push(["link", "Link"]);
 TABS.push(["layers", "Layers"]);
 let curTab = hasPlan ? (plan.violations.length ? "issues" : "aircraft") : "contacts";
-function esc(s) { return String(s).replace(/[&<>]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;" }[c])); }
+function esc(s) { return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c])); }
 function buildCard() {
   const c = $("card"); let h = "";
   if (!hasPlan) {

@@ -53,6 +53,14 @@ score = Σ points of served contacts  −  λ · energy used (Wh)  −  μ · ef
 
 **Optional add-on:** a scout observation of a hostile contact completed 10 to 120 s after its last engagement verifies the outcome and adds 25% to its points (`score ... --verify`).
 
+## Link loss (optional second part)
+
+What if the link to the ground is cut mid-mission? Write a policy that keeps the mission safe with what the aircraft sense and hear from each other, using as little communication as you can. Everything you need, with a simulator, baselines, a scorer and a sizing grid, is in [`LINKLOSS.md`](LINKLOSS.md).
+
+```sh
+python3 -m fleetkit events scenario.json plan.json --seed 1 -o events.json
+python3 -m fleetkit linkloss scenario.json plan.json events.json broadcast
+```
 
 ## See what your plan does
 
@@ -64,7 +72,7 @@ One self-contained page (no install, no network): a map you can pan and zoom, an
 
 ## Live validation board
 
-Upload plans (not code) for eight public scenarios and watch a live board rank the teams: `python3 -m fleetkit validation-set -o validation`, then `board-login` with the address and token the organisers give you, then `python3 -m fleetkit submit-all my-plans/` (plans named `L1-101.json`, `L2-201.json`, ...). It is a validation set; the final ranking uses scenarios you have not seen. See [`LEADERBOARD.md`](LEADERBOARD.md).
+Upload plans (not code) for eight public scenarios and watch a live board rank the teams: `python3 -m fleetkit validation-set -o validation`, then `board-login` with the address and token the organisers give you (leave `--token` out to be asked for it), then `python3 -m fleetkit submit-all my-plans/` (plans named `L1-101.json`, `L2-201.json`, ...). It is a validation set; the final ranking uses scenarios you have not seen. See [`LEADERBOARD.md`](LEADERBOARD.md).
 
 ## Tests
 

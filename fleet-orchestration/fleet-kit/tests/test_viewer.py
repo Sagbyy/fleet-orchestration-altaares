@@ -149,3 +149,39 @@ def test_the_animated_svg_is_well_formed_small_and_self_contained(tmp_path):
     cli_main(["baseline", str(s_path), "-o", str(p_path)])
     assert cli_main(["viz", str(s_path), str(p_path), "--animate", "-o", str(out)]) == 0 and out.read_text().startswith("<svg")
     assert cli_main(["viz", str(s_path), "--animate", "-o", str(out)]) == 2
+
+
+HOSTILE = '<img src=x onerror=alert(1)>'
+
+
+def test_text_that_could_be_markup_is_refused_before_it_reaches_the_page(scenario, plan):
+    from fleetkit.viewer.model import check_safe_text
+    check_safe_text(scenario)                                          # the hand-written and generated ones pass
+    for path, key in ((("contacts", 0), "id"), (("aircraft", 0), "id"), (("zones", 0), "id"), (("contacts", 0), "class")):
+        from conftest import make_scenario_dict
+        d = make_scenario_dict()
+        d[path[0]][path[1]][key] = HOSTILE
+        with pytest.raises(ValueError, match="viewer cannot show"):
+            build_model(Scenario.from_dict(d), plan if key != "class" else None)
+    d = make_scenario_dict()
+    d["level"] = '"><script>x</script>'
+    with pytest.raises(ValueError):
+        build_model(Scenario.from_dict(d))
+    with pytest.raises(ValueError, match="event kind"):
+        build_model(scenario, events={"t_loss": 10, "events": [{"t": 1, "kind": HOSTILE}]})
+    with pytest.raises(ValueError, match="event contact"):
+        build_model(scenario, events={"t_loss": 10, "events": [{"t": 1, "kind": "reclassify", "contact": HOSTILE}]})
+
+
+def test_the_svg_and_the_page_escape_what_a_scenario_file_says(scenario):
+    from conftest import make_scenario_dict
+    from fleetkit.viz import render_svg
+    d = make_scenario_dict()
+    d["contacts"][0]["id"] = HOSTILE
+    d["zones"][0]["id"] = "<script>alert(1)</script>"
+    svg = render_svg(Scenario.from_dict(d), None, title="<b>x</b>")
+    assert "<img" not in svg and "<script" not in svg and "<b>" not in svg and "&lt;img" in svg
+    page = render_html(build_model(scenario, title="</script><!-- x"))
+    blob = page.split('<script id="data" type="application/json">')[1].split("</script>")[0]
+    assert "<!--" not in blob and "</" not in blob and json.loads(blob)["meta"]["title"] == "</script><!-- x"
+    assert 'esc(s) { return String(s).replace(/[&<>"\']/g' in page                  # quotes are escaped too
