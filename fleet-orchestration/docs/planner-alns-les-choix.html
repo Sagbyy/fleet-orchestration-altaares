@@ -1,0 +1,415 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>:root{color-scheme:light;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}body{margin:0;font:14px system-ui,-apple-system,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Planner ALNS, les choix</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Sans+Condensed:wght@600&display=swap">
+<style>
+/* Layout: one column of steps; each step = what happens, a picture, then a "pourquoi / avantage" pair. */
+:root {
+  --bg: #f2f4f6; --panel: #ffffff; --fg: #16202a; --muted: #5a6876; --line: #c3ccd5;
+  --accent: #1f5fbf; --accent-soft: #dfe9f9; --win: #1d7a46; --win-soft: #dcf1e4; --amber: #a86200; --amber-soft: #fbeed8;
+  --bad: #b3261e; --bad-soft: #f8e0de;
+  --sans: "IBM Plex Sans", system-ui, -apple-system, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+  --display: "IBM Plex Sans Condensed", "IBM Plex Sans", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #10161c; --panel: #17212a; --fg: #e4eaf0; --muted: #94a2af; --line: #34424f;
+  --accent: #7eaaf0; --accent-soft: #1c2f4b; --win: #6fd29a; --win-soft: #163424; --amber: #e7a750; --amber-soft: #3a2a12; --bad: #f08a80; --bad-soft: #3d1a17; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #10161c; --panel: #17212a; --fg: #e4eaf0; --muted: #94a2af; --line: #34424f;
+  --accent: #7eaaf0; --accent-soft: #1c2f4b; --win: #6fd29a; --win-soft: #163424; --amber: #e7a750; --amber-soft: #3a2a12; --bad: #f08a80; --bad-soft: #3d1a17; color-scheme: dark }
+body { background: var(--bg); color: var(--fg); font: 15px/1.6 var(--sans); }
+main { max-width: 1040px; margin: 0 auto; padding-block: 40px 80px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 56px; }
+header { display: grid; gap: 10px; }
+.eyebrow { font: 500 12px var(--mono); color: var(--muted); letter-spacing: .05em; text-transform: uppercase; }
+h1 { font: 600 36px/1.12 var(--display); margin: 0; text-wrap: balance; }
+h2 { font: 600 23px/1.25 var(--display); margin: 0; text-wrap: balance; display: flex; gap: 12px; align-items: baseline; }
+h2 .n { font: 500 13px var(--mono); color: var(--accent); flex: none; }
+p { margin: 0; max-width: 68ch; }
+code { font: 13px var(--mono); background: var(--accent-soft); padding: 1px 5px; border-radius: 3px; }
+section { display: grid; gap: 16px; }
+.what { color: var(--muted); }
+.why { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.why > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 12px 16px; display: grid; gap: 4px; align-content: start; }
+.why .k { font: 500 11px var(--mono); letter-spacing: .06em; text-transform: uppercase; }
+.why .p .k { color: var(--accent); }
+.why .a { border-color: color-mix(in srgb, var(--win) 45%, var(--line)); }
+.why .a .k { color: var(--win); }
+figure { margin: 0; display: grid; gap: 8px; }
+figure img { display: block; width: 100%; height: auto; border: 1px solid var(--line); border-radius: 6px; background: #fff; }
+figure.small img { max-width: 460px; padding: 12px; box-sizing: border-box; }
+figcaption { font-size: 13px; color: var(--muted); max-width: 80ch; }
+.src { font: 11px var(--mono); color: var(--muted); }
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 14px; }
+.duo figure .tag { font: 600 13px var(--mono); }
+.split { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 20px; align-items: center; }
+@media (max-width: 720px) { .split { grid-template-columns: 1fr; } }
+.scroll { overflow-x: auto; background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 14px; }
+svg { display: block; width: 100%; min-width: 760px; height: auto; }
+svg .bx { fill: var(--panel); stroke: var(--line); stroke-width: 1.2; }
+svg .hot { fill: var(--accent-soft); stroke: var(--accent); stroke-width: 1.5; }
+svg .ok { fill: var(--win-soft); stroke: var(--win); stroke-width: 1.4; }
+svg .t { font: 600 13px var(--sans); fill: var(--fg); }
+svg .s { font: 11px var(--mono); fill: var(--muted); }
+svg .ln { stroke: var(--muted); stroke-width: 1.4; fill: none; }
+svg .hd { fill: var(--muted); }
+.tw { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; }
+th, td { text-align: right; padding: 7px 10px; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+th { font: 600 11.5px var(--mono); color: var(--muted); letter-spacing: .04em; }
+td { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+td.g { color: var(--win); font-weight: 500; }
+tfoot td { font-weight: 600; border-bottom: none; }
+.credits { font-size: 12px; color: var(--muted); display: grid; gap: 4px; }
+.toc { display: flex; flex-wrap: wrap; gap: 8px; }
+.toc a { font: 500 13px var(--mono); color: var(--accent); text-decoration: none; border: 1px solid var(--line); background: var(--panel); border-radius: 4px; padding: 5px 10px; }
+.toc a:hover, .toc a:focus-visible { border-color: var(--accent); outline: none; }
+.part { display: grid; gap: 4px; padding-top: 18px; border-top: 2px solid var(--fg); }
+.part .ph { font-size: 30px; }
+.grid4 { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; }
+.grid4 > div { background: var(--panel); border: 1px solid var(--line); border-radius: 6px; padding: 10px 14px; display: grid; gap: 2px; align-content: start; }
+.grid4 b { font: 500 13px var(--mono); }
+.grid4 span { font-size: 13.5px; color: var(--muted); }
+.formula { font: 14px var(--mono); background: var(--panel); border: 1px solid var(--line); border-radius: 4px; padding: 10px 12px; overflow-x: auto; white-space: nowrap; }
+td.bad { color: var(--bad); font-weight: 500; }
+svg .no { fill: var(--bad-soft); stroke: var(--bad); stroke-width: 1.3; }
+</style>
+
+</head>
+<body>
+<main>
+<header>
+  <div class="eyebrow">fleet-kit · handin/fleetplan · exemple L3-301</div>
+  <h1>Planner ALNS, les choix</h1>
+  <p>Chaque étape, pourquoi on l'a faite comme ça, et ce qu'elle rapporte. Partie 1 : le planner (étapes 00 à 09, scénario L3-301). Partie 2 : la policy embarquée quand la liaison sol est coupée (étapes 10 à 17). Toutes les captures viennent du viewer du kit.</p>
+  <nav class="toc"><a href="#planner">Partie 1 · Planner</a><a href="#linkloss">Partie 2 · Link loss</a></nav>
+</header>
+
+<div class="part" id="planner"><span class="eyebrow">Partie 1</span><h2 class="ph">Le planner</h2></div>
+
+<section>
+  <h2><span class="n">00</span>Le problème</h2>
+  <div class="split">
+    <figure class="small">
+      <img src="img/vrp.png" alt="Schéma du problème de tournées de véhicules : un dépôt central et trois tournées colorées qui desservent des clients.">
+      <figcaption>Un dépôt, des véhicules, des clients à visiter : le problème de tournées classique (VRP).</figcaption>
+    </figure>
+    <p>Pour nous : le dépôt est la base, les véhicules sont les scouts, les clients sont les contacts. Chaque contact a une <b>fenêtre de temps</b> et rapporte des points, et on n'est pas obligé de tous les servir. C'est un <b>TOPTW</b> (tournées d'orientation avec fenêtres). Il s'y ajoute l'affectation des effecteurs aux hostiles. C'est NP-difficile : on cherche une très bonne solution en 45 s, pas l'optimum prouvé.</p>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">01</span>Baseline d'abord, ALNS ensuite</h2>
+  <p class="what"><code>planner.py</code> calcule le plan glouton fourni, puis lance l'ALNS avec le temps restant, et écrit le meilleur plan <b>valide</b>.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Un plan invalide vaut 0, un crash aussi.</div>
+    <div class="a"><span class="k">Avantage</span>Plancher garanti : on ne fait jamais moins que la baseline, même si l'ALNS plante ou manque de temps.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">02</span>Prétraitement : écarter l'impossible</h2>
+  <figure>
+    <img src="img/L3-301-pre.jpg" alt="Viewer, scénario L3-301 sans plan : anneaux d'observation bleus autour des contacts gardés, C06 et C09 marqués écartés pour R7 collatéral près d'un ami et d'un civil.">
+    <figcaption>Cercles bleus : anneau d'observation (146,5 m) des 18 contacts gardés. En rose : C06 et C09, hostiles trop proches d'un ami (C23) ou d'un civil (C25), écartés par R7. Calque ajouté au viewer pour cette page.</figcaption>
+  </figure>
+  <p class="what">On retire les contacts qui ne peuvent rien rapporter : collatéral R7, besoins plus grands que la flotte, fenêtre plus courte que le dwell de 20 s, aucun point d'observation libre sur l'anneau, aucun effecteur à portée.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Ces contacts sont impossibles quel que soit le plan. Les tester à chaque itération ne sert à rien.</div>
+    <div class="a"><span class="k">Avantage</span>Moins de candidats, donc plus d'itérations ALNS dans les 45 s, et aucune itération perdue sur une cible morte.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">03</span>Découper : scouts d'un côté, effecteurs de l'autre</h2>
+  <p class="what">L'ALNS ne cherche que les <b>tournées des scouts</b>. Les effecteurs sont affectés ensuite aux hostiles observés.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Un effecteur fait un aller simple vers une seule cible : c'est une affectation, pas une tournée.</div>
+    <div class="a"><span class="k">Avantage</span>Espace de recherche bien plus petit, et l'affectation se résout exactement et vite.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">04</span>Solution initiale : insertion regret-2</h2>
+  <figure>
+    <img src="img/L3-301-initial.jpg" alt="Viewer, L3-301 : les tournées des scouts après l'insertion regret-2 initiale, tracées en bleu depuis la base en bas à gauche.">
+    <figcaption>Tournées des scouts après la première insertion regret-2 (points d'observation reliés en ligne droite ; le vrai trajet contourne les zones).</figcaption>
+  </figure>
+  <p class="what">On insère d'abord le contact qui a le plus à perdre s'il attend : <code>score = g1 + (g1 − g2)</code>, avec g1 et g2 le meilleur et le 2ᵉ meilleur gain d'insertion.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Le glouton prend le gain immédiat et bloque des contacts qui n'avaient qu'une seule bonne place.</div>
+    <div class="a"><span class="k">Avantage</span>Bon point de départ en une passe. Le même opérateur sert ensuite de repair dans l'ALNS.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">05</span>La boucle ALNS : casser, reconstruire</h2>
+  <div class="scroll">
+    <svg viewBox="0 0 900 190" role="img" aria-label="Boucle ALNS : roulette, destroy, repair, réaffectation hongroise, évaluation, acceptation par recuit simulé, retour à la roulette avec mise à jour des poids.">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="hot" x="10" y="30" width="130" height="58" rx="5"/><text class="t" x="75" y="55" text-anchor="middle">Roulette</text><text class="s" x="75" y="73" text-anchor="middle">choisit D + R</text>
+      <rect class="bx" x="160" y="30" width="130" height="58" rx="5"/><text class="t" x="225" y="55" text-anchor="middle">Destroy</text><text class="s" x="225" y="73" text-anchor="middle">retire 10–30 %</text>
+      <rect class="bx" x="310" y="30" width="130" height="58" rx="5"/><text class="t" x="375" y="55" text-anchor="middle">Repair</text><text class="s" x="375" y="73" text-anchor="middle">regret-2 (bruité)</text>
+      <rect class="bx" x="460" y="30" width="130" height="58" rx="5"/><text class="t" x="525" y="55" text-anchor="middle">Hongrois</text><text class="s" x="525" y="73" text-anchor="middle">tour → scout</text>
+      <rect class="bx" x="610" y="30" width="130" height="58" rx="5"/><text class="t" x="675" y="55" text-anchor="middle">Évaluer</text><text class="s" x="675" y="73" text-anchor="middle">objectif</text>
+      <rect class="ok" x="760" y="30" width="130" height="58" rx="5"/><text class="t" x="825" y="55" text-anchor="middle">Accepter ?</text><text class="s" x="825" y="73" text-anchor="middle">recuit simulé</text>
+      <line class="ln" x1="140" y1="59" x2="158" y2="59" marker-end="url(#ar)"/>
+      <line class="ln" x1="290" y1="59" x2="308" y2="59" marker-end="url(#ar)"/>
+      <line class="ln" x1="440" y1="59" x2="458" y2="59" marker-end="url(#ar)"/>
+      <line class="ln" x1="590" y1="59" x2="608" y2="59" marker-end="url(#ar)"/>
+      <line class="ln" x1="740" y1="59" x2="758" y2="59" marker-end="url(#ar)"/>
+      <path class="ln" d="M825 88 V140 H75 V90" marker-end="url(#ar)"/>
+      <text class="s" x="450" y="160" text-anchor="middle">récompense de l'opérateur : nouveau best +33 · mieux +9 · accepté +3</text>
+    </svg>
+  </div>
+  <p class="what">5 destroy (aléatoire, pires, liés, route entière, secteur) × 3 repair (regret, regret bruité, glouton bruité). Leurs poids s'adaptent tous les 30 tours.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Avec des fenêtres serrées, déplacer un seul contact échoue presque toujours. Retirer un bloc entier et le reconstruire débloque la situation.</div>
+    <div class="a"><span class="k">Avantage</span>Grands sauts dans l'espace de recherche, et la roulette apprend seule quels opérateurs marchent sur <i>ce</i> scénario.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">06</span>Acceptation par recuit simulé</h2>
+  <div class="split">
+    <figure>
+      <img src="img/sa.gif" alt="Animation : un point explore une courbe à plusieurs bosses, accepte de redescendre au début, puis se fixe sur le maximum global.">
+      <figcaption>Le recuit accepte de descendre au début, puis se stabilise sur le plus haut sommet.</figcaption>
+    </figure>
+    <p>Une solution moins bonne est acceptée avec une probabilité <code>exp(Δ/T)</code>. La température <code>T</code> baisse jusqu'à 0 à la deadline.</p>
+  </div>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>N'accepter que les améliorations bloque vite dans un optimum local.</div>
+    <div class="a"><span class="k">Avantage</span>Exploration au début, intensification à la fin. Le meilleur plan trouvé est toujours conservé.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">07</span>Algorithme hongrois pour les affectations</h2>
+  <div class="split">
+    <figure class="small">
+      <img src="img/bip.png" alt="Graphe biparti : trois nœuds en haut, quatre en bas, un couplage en rouge.">
+      <figcaption>Couplage dans un graphe biparti : chaque tâche reçoit au plus un agent.</figcaption>
+    </figure>
+    <p>Utilisé deux fois : réaffecter les tournées aux scouts (chacun a sa base et sa batterie) et affecter les effecteurs aux hostiles à énergie minimale.</p>
+  </div>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Ce sont des problèmes d'affectation pure, pour lesquels il existe un algorithme exact.</div>
+    <div class="a"><span class="k">Avantage</span>Affectation optimale garantie en O(n³), moins d'une milliseconde à notre taille. Pas besoin d'heuristique.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">08</span>Réalisation 3D et validateur officiel</h2>
+  <figure>
+    <img src="img/L3-301-alns-0.3.jpg" alt="Viewer, plan ALNS L3-301 à t = 240 s : scouts et effecteurs en vol, timeline avec observations et engagements, plan VALID 721,5.">
+    <figcaption>Le plan final à t = 240 s : scouts en observation (cercles verts), effecteurs en route, frise des observations (●) et engagements (✕). Validateur : VALID, 0 problème.</figcaption>
+  </figure>
+  <p class="what">Les 5 meilleures solutions (élites) deviennent des waypoints datés en 3D : altitudes, séparation 40 m, synchronisation des groupes. On répare au validateur officiel et on garde le meilleur vrai score.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>L'ALNS travaille sur un modèle 2D simplifié qui ne classe pas toujours les solutions comme le vrai score.</div>
+    <div class="a"><span class="k">Avantage</span>Plusieurs essais au lieu d'un seul, et chaque plan rendu est vérifié par le même validateur que le board.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">09</span>Le résultat sur L3-301</h2>
+  <div class="duo">
+    <figure>
+      <span class="tag">Glouton · 423,8</span>
+      <img src="img/L3-301-greedy-end.jpg" alt="Viewer, fin du plan glouton sur L3-301 : 10 contacts entourés en vert.">
+      <figcaption>10 contacts servis, 15 effecteurs, 200 Wh.</figcaption>
+    </figure>
+    <figure>
+      <span class="tag" style="color:var(--win)">ALNS · 721,5</span>
+      <img src="img/L3-301-alns-end.jpg" alt="Viewer, fin du plan ALNS sur L3-301 : 18 contacts entourés en vert, seuls C06 et C09 ne le sont pas.">
+      <figcaption>18 contacts servis, 19 effecteurs, 191 Wh. Seuls C06 et C09 manquent : R7 les interdit.</figcaption>
+    </figure>
+  </div>
+  <p class="what">Cercle vert = contact servi. Même scénario, même flotte : +70 %, avec moins d'énergie.</p>
+
+  <div class="tw"><table>
+    <thead><tr><th>Scénario</th><th>Glouton</th><th>ALNS</th><th>Gain</th></tr></thead>
+    <tbody>
+      <tr><td>L1-101</td><td>68,0</td><td>70,8</td><td class="g">+4 %</td></tr>
+      <tr><td>L2-201</td><td>277,8</td><td>294,9</td><td class="g">+6 %</td></tr>
+      <tr><td>L2-202</td><td>232,9</td><td>266,7</td><td class="g">+15 %</td></tr>
+      <tr><td>L3-301</td><td>423,8</td><td>721,5</td><td class="g">+70 %</td></tr>
+      <tr><td>L3-302</td><td>326,5</td><td>416,1</td><td class="g">+27 %</td></tr>
+      <tr><td>L3-303</td><td>275,9</td><td>444,9</td><td class="g">+61 %</td></tr>
+      <tr><td>L4-401</td><td>641,2</td><td>1 673,4</td><td class="g">×2,6</td></tr>
+      <tr><td>L4-402</td><td>418,5</td><td>1 186,5</td><td class="g">×2,8</td></tr>
+    </tbody>
+    <tfoot><tr><td>Total</td><td>2 664,5</td><td>5 074,7</td><td class="g">×1,90</td></tr></tfoot>
+  </table></div>
+  <p class="what">Run du 21/11/2026, 8 plans valides, 43 s au maximum par scénario. Plus le scénario est gros, plus l'écart se creuse : c'est là que la recherche paie.</p>
+</section>
+
+<div class="part" id="linkloss"><span class="eyebrow">Partie 2</span><h2 class="ph">Link loss : quand le sol se tait</h2></div>
+
+<section>
+  <h2><span class="n">10</span>Le défi</h2>
+  <p class="what">À <code>t_loss</code>, la liaison sol est coupée pour toute la flotte. Chaque appareil appelle alors <code>Policy.step(obs)</code> une fois par seconde et choisit une action. Il ne peut pas inventer de route.</p>
+  <div class="grid4">
+    <div><b>continue</b><span>suivre la route</span></div>
+    <div><b>speed 0,5–1</b><span>la suivre plus lentement</span></div>
+    <div><b>hold</b><span>faire du sur-place</span></div>
+    <div><b>return</b><span>remonter la route jusqu'à la base</span></div>
+  </div>
+  <p class="what">Trois événements non annoncés : un hostile <b>reclassé ami</b>, une <b>zone interdite</b> qui apparaît, un appareil en <b>panne</b>. On ne les détecte qu'à moins de 300 m.</p>
+  <div class="formula">S_loss = rétention moyenne − 0,002 × messages par appareil par minute &nbsp;&nbsp;|&nbsp;&nbsp; séparation R8, zone, ami frappé, R4 ou exception → rétention 0</div>
+  <div class="why">
+    <div class="p"><span class="k">Ce qui compte</span>Une seule faute sur toute la flotte met le run à 0. La sécurité passe avant les points.</div>
+    <div class="a"><span class="k">Et ensuite</span>Garder un maximum de la mission avec le moins de messages possible, parce que chaque message coûte.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">11</span>Dead reckoning : le plan sert de carte des autres</h2>
+  <div class="split">
+    <figure class="small">
+      <img src="img/dr.png" alt="Navigation à l'estime : un cap et une vitesse connus donnent la position aux heures suivantes, 0900, 0930, 1000.">
+      <figcaption>Navigation à l'estime : cap et vitesse connus, donc position connue sans la mesurer.</figcaption>
+    </figure>
+    <p>Chaque appareil embarque le plan complet. Un pair qui ne dit rien est supposé le suivre exactement : sa position se calcule sur son horloge de route (<code>RouteClock</code>). Seul celui qui <b>dévie</b> du plan parle.</p>
+  </div>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Diffuser sa position chaque seconde (baseline <code>broadcast</code>) coûte 60 messages par minute et sature la radio.</div>
+    <div class="a"><span class="k">Avantage</span>1,7 à 6,4 messages par appareil par minute, soit ~0,01 point de pénalité au lieu de 0,12.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">12</span>Deux messages, envoyés sur événement</h2>
+  <div class="split">
+    <figure class="small">
+      <img src="img/flood.gif" alt="Animation d'inondation réseau : un message part d'un nœud et se propage de voisin en voisin.">
+      <figcaption>Propagation de proche en proche : chaque nœud relaie ce qu'il reçoit.</figcaption>
+    </figure>
+    <div class="grid4" style="grid-template-columns:1fr">
+      <div><b>{"k":[tau,rate]}</b><span>« Je quitte le plan : mon horloge est à tau et avance à rate (1, 0,5, 0 ou −1). »</span></div>
+      <div><b>{"o":["C12"]}</b><span>« L'observation de C12 est finie. » Le scout l'envoie, chaque appareil la relaie une fois.</span></div>
+    </div>
+  </div>
+  <p class="what">Chaque nouvelle info part 2 fois (5 % de perte, donc 0,25 % de chance de tout perdre). Elle est répétée seulement quand un effecteur concerné est proche et va bientôt frapper. Taille toujours ≤ 64 octets.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>La capacité radio est partagée (50 à 800 o/s). Les messages inutiles font perdre les utiles.</div>
+    <div class="a"><span class="k">Avantage</span>Tient sur le réglage le plus serré : 50 o/s suffisent à toutes les portées (frontière en §17).</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">13</span>Porte R4 : pas de preuve, pas de frappe</h2>
+  <figure>
+    <img src="img/LL-L3-0-broadcast-420.jpg" alt="Viewer link-loss, L3-0 avec la baseline broadcast : run échoué, rétention 0, trois violations R4 sur C12, frappé sans observation terminée.">
+    <figcaption>Baseline <code>broadcast</code> sur L3-0 : le scout de C12 fait demi-tour à cause de la nouvelle zone, mais trois effecteurs frappent quand même C12. R4 est violée, le run vaut 0 %.</figcaption>
+  </figure>
+  <p class="what">Un effecteur ne frappe que s'il sait qu'une observation de sa cible s'est terminée au moins 10 s avant (+0,5 s de marge). Sinon il s'arrête un pas avant la cible et attend la confirmation par message.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Après la coupure, rien ne garantit que le scout a fini. Frapper à l'aveugle peut mettre tout le run à 0.</div>
+    <div class="a"><span class="k">Avantage</span>Au pire, on perd une cible, jamais le run. Les observations finies avant la coupure sont déjà acquises : elles ne coûtent aucun message.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">14</span>Danger détecté : abandonner proprement</h2>
+  <div class="duo">
+    <figure>
+      <span class="tag">Zone surprise · L3-0</span>
+      <img src="img/LL-L3-0-policy-420.jpg" alt="Viewer link-loss, L3-0 avec ta policy : nouvelle zone NEW1, le scout S04 en attente, run sans échec, rétention 100 %.">
+      <figcaption>Nouvelle zone NEW1 : S04 s'arrête puis fait demi-tour, et les effecteurs de C12 n'attaquent pas. 100 %, 0 violation.</figcaption>
+    </figure>
+    <figure>
+      <span class="tag">Cible reclassée · L2-1</span>
+      <img src="img/LL-L2-1-policy-392.jpg" alt="Viewer link-loss, L2-1 avec ta policy : C06 reclassé ami, L03 en panne, run sans échec, rétention 100 %.">
+      <figcaption>C06 devient ami (carré bleu) et L03 tombe en panne. Personne ne frappe C06. 100 %, 0 violation.</figcaption>
+    </figure>
+  </div>
+  <p class="what">Cible reclassée, zone sur la route, ou fenêtre déjà ratée : l'appareil passe en <code>return</code>. Un scout termine d'abord les observations encore possibles avant la zone (il garde 8 s de marge).</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>On ne peut pas contourner, seulement s'arrêter, ralentir ou reculer. Reculer sur sa route est toujours sûr.</div>
+    <div class="a"><span class="k">Avantage</span>Zéro faute sur les événements, et le scout récupère quand même ce qu'il peut avant de partir.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">15</span>Le bouclier anticollision</h2>
+  <div class="scroll">
+    <svg viewBox="0 0 900 170" role="img" aria-label="Bouclier : on teste les actions dans l'ordre continue, ralentir, attendre, reculer ; chacune est simulée sur 4 à 6 secondes contre les pairs prédits et les zones ; la première sûre est jouée.">
+      <defs><marker id="ar2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path class="hd" d="M0 0L10 5L0 10z"/></marker></defs>
+      <rect class="hot" x="10" y="20" width="150" height="58" rx="5"/><text class="t" x="85" y="45" text-anchor="middle">Intention</text><text class="s" x="85" y="63" text-anchor="middle">continue/wait/return</text>
+      <rect class="bx" x="190" y="20" width="110" height="58" rx="5"/><text class="t" x="245" y="45" text-anchor="middle">1,0</text><text class="s" x="245" y="63" text-anchor="middle">continue</text>
+      <rect class="bx" x="320" y="20" width="110" height="58" rx="5"/><text class="t" x="375" y="45" text-anchor="middle">0,5</text><text class="s" x="375" y="63" text-anchor="middle">ralentir</text>
+      <rect class="bx" x="450" y="20" width="110" height="58" rx="5"/><text class="t" x="505" y="45" text-anchor="middle">0</text><text class="s" x="505" y="63" text-anchor="middle">hold</text>
+      <rect class="bx" x="580" y="20" width="110" height="58" rx="5"/><text class="t" x="635" y="45" text-anchor="middle">−1</text><text class="s" x="635" y="63" text-anchor="middle">return</text>
+      <rect class="ok" x="730" y="20" width="160" height="58" rx="5"/><text class="t" x="810" y="45" text-anchor="middle">1re action sûre</text><text class="s" x="810" y="63" text-anchor="middle">jouée</text>
+      <line class="ln" x1="160" y1="49" x2="188" y2="49" marker-end="url(#ar2)"/>
+      <line class="ln" x1="300" y1="49" x2="318" y2="49" marker-end="url(#ar2)"/>
+      <line class="ln" x1="430" y1="49" x2="448" y2="49" marker-end="url(#ar2)"/>
+      <line class="ln" x1="560" y1="49" x2="578" y2="49" marker-end="url(#ar2)"/>
+      <line class="ln" x1="690" y1="49" x2="728" y2="49" marker-end="url(#ar2)"/>
+      <rect class="no" x="190" y="104" width="500" height="50" rx="5"/>
+      <text class="t" x="440" y="125" text-anchor="middle">Test de chaque action : simulation sur 4–6 s, pas de 0,25 s</text>
+      <text class="s" x="440" y="143" text-anchor="middle">distance ≥ 40 m + 10 m de marge · ≥ 25 m des zones · un pair peut aussi s'arrêter</text>
+      <line class="ln" x1="440" y1="78" x2="440" y2="102"/>
+    </svg>
+  </div>
+  <p class="what">Les actions sont testées dans l'ordre de préférence propre à l'intention. Pour chaque pair, on vérifie deux futurs : il fait ce qu'il a annoncé, ou il s'arrête. Si rien n'est sûr sur tout l'horizon, on prend l'action sûre sur les 2 prochaines secondes.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Une seule perte de séparation suffit à faire échouer le run, et un pair dévié ne fera pas de place.</div>
+    <div class="a"><span class="k">Avantage</span>On reste sur le plan tant que c'est sûr (pas de points perdus), et on ne dévie qu'au dernier moment.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">16</span>Filet de sécurité et rapidité</h2>
+  <p class="what"><code>step()</code> est enveloppée dans un <code>try/except</code> qui renvoie <code>hold</code>. La bibliothèque standard suffit, et un appel dure 0,02 à 0,1 ms.</p>
+  <div class="why">
+    <div class="p"><span class="k">Pourquoi</span>Une exception fait échouer le run, et la cible matérielle est un Raspberry Pi 5 limité à 50 ms par appel.</div>
+    <div class="a"><span class="k">Avantage</span>Un bug devient un sur-place au lieu d'un 0, et il reste 500 fois plus de marge que la limite.</div>
+  </div>
+</section>
+
+<section>
+  <h2><span class="n">17</span>Le résultat</h2>
+  <div class="tw"><table>
+    <thead><tr><th>Cas</th><th>Événements</th><th>Ta policy</th><th>Msg/min</th><th>broadcast</th><th>Msg/min</th></tr></thead>
+    <tbody>
+      <tr><td>L2-0</td><td style="text-align:right">reclassé, panne</td><td class="g">0,996</td><td>1,8</td><td>0,880</td><td>60</td></tr>
+      <tr><td>L2-1</td><td style="text-align:right">panne, reclassé</td><td class="g">0,997</td><td>1,7</td><td class="bad">échec</td><td>60</td></tr>
+      <tr><td>L3-0</td><td style="text-align:right">zone, panne</td><td class="g">0,987</td><td>6,4</td><td class="bad">échec</td><td>60</td></tr>
+      <tr><td>L3-1</td><td style="text-align:right">panne, reclassé</td><td class="g">0,997</td><td>1,7</td><td class="bad">échec</td><td>60</td></tr>
+      <tr><td>L4-0</td><td style="text-align:right">reclassé, panne</td><td class="g">0,997</td><td>1,7</td><td class="bad">échec</td><td>60</td></tr>
+      <tr><td>L4-1</td><td style="text-align:right">panne, reclassé</td><td class="g">0,996</td><td>2,2</td><td>0,380</td><td>60</td></tr>
+    </tbody>
+  </table></div>
+  <p class="what">Score S_loss par cas (<code>check_policy.py</code>, 2 graines radio par cas, réglage du board 1000 m · 200 o/s). Rétention de 100 % partout, 0 run en échec. <code>broadcast</code> échoue sur 5 des 6 cas.</p>
+  <div class="tw"><table>
+    <thead><tr><th>Portée \ capacité</th><th>50 o/s</th><th>100</th><th>200</th><th>400</th><th>800</th></tr></thead>
+    <tbody>
+      <tr><td>250 m</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td></tr>
+      <tr><td>500 m</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td></tr>
+      <tr><td>1000 m</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td></tr>
+      <tr><td>2000 m</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td><td class="g">1,00 ✓</td></tr>
+    </tbody>
+  </table></div>
+  <p class="what">Grille de sizing sur L3-0, le cas le plus dur (zone surprise) : 20 cases sur 20, sizing score 1,00. La frontière est à 50 o/s pour toutes les portées, la plus basse possible.</p>
+</section>
+
+<footer class="credits">
+  <span>Schémas : « Figure illustrating the vehicle routing problem » (PierreSelim, domaine public) · « Hill Climbing with Simulated Annealing » (Kingpin13, CC0) · « Bipartite graph with matching » (Illes, domaine public) · « Dead-reckoning colour » (Belbury, CC0) · « Flooding routing » (SuperFLoh, CC BY 2.5), Wikimedia Commons.</span>
+  <span>Captures : viewer fleetkit, scénario de validation L3-301 et replays link-loss L3-0 et L2-1 (scénarios générés, plans glouton, événements <code>make_events</code>).</span>
+</footer>
+</main>
+</body>
+
+</html>

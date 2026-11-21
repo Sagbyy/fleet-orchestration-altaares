@@ -9,6 +9,8 @@ Chaque étape, pourquoi on l'a faite comme ça, et ce qu'elle rapporte.
 
 Toutes les captures viennent du viewer du kit.
 
+> 🌐 Version page web, plus visuelle : [planner-alns-les-choix.html](planner-alns-les-choix.html) (à ouvrir dans un navigateur).
+
 ---
 
 ## Partie 1 : le planner

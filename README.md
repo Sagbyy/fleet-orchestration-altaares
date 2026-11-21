@@ -15,6 +15,8 @@ Le projet a deux livrables :
 
 📖 **Le pourquoi de chaque choix, avec schémas et captures du viewer : [docs/planner-alns-les-choix.md](fleet-orchestration/docs/planner-alns-les-choix.md)**
 
+🌐 **Version page web, plus visuelle :** [`docs/planner-alns-les-choix.html`](fleet-orchestration/docs/planner-alns-les-choix.html). Ouvre-la dans un navigateur après le clone (`open fleet-orchestration/docs/planner-alns-les-choix.html`) : GitHub affiche le code HTML, pas la page.
+
 ## Résultats
 
 ### Planner : les 8 scénarios de validation
