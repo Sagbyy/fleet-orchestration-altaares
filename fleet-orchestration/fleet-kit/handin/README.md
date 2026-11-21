@@ -3,6 +3,39 @@
 `python3 planner.py scenario.json plan.json` — standard library only, about 30–40 s per scenario,
 always writes a valid plan.
 
+## Code layout
+
+```
+planner.py                 entry point: baseline first, then the optimiser, write the better valid plan
+fleetplan/
+  config.py                every tunable: Settings (FLEET_* env), flight margins, layers, search tables
+  clock.py                 time source (wall clock, or virtual for reproducible test runs)
+  world.py                 problem model: candidates, scouts, effectors, estimates
+  geometry/                obstacles.py (detours, model leg length) · separation.py (R8 test)
+  algorithms/hungarian.py  rectangular min-cost assignment
+  search/                  tour.py · solution.py · matching.py · insertion.py · reassign.py
+                           destroy.py (operator registry) · local_search.py · alns.py · params.py
+  flight/                  waypoints.py · airspace.py · scouts.py (ScoutPlacer) · effectors.py
+  pipeline/                solver.py · repair.py · pruning.py · verify.py
+tests/regression.py        bit-exact regression snapshot (deterministic mode, 12 cases)
+bench.py                   multi-seed benchmark against the baseline
+```
+
+Each module has one job; dependencies point one way (pipeline -> flight/search -> world ->
+geometry/algorithms -> config). New destroy operators go in `search/destroy.py`'s registry, new
+switches in `config.Settings`.
+
+## Tests
+
+```sh
+python3 tests/regression.py            # must print ALL IDENTICAL (12 cases, ~5 s)
+python3 tests/regression.py --record   # only after an intended behaviour change
+python3 check_handin.py                # official-style run
+```
+
+The regression test runs the planner with a virtual clock (FLEET_DETERMINISTIC=1), so each case
+produces the same plan bit for bit; it guarded the refactor into this layout.
+
 ## Pipeline
 
 ```

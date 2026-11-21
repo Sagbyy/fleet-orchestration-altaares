@@ -138,77 +138,100 @@ def _launch_slack(world: World, s: ScoutInfo, cidx, pts, cache) -> float:
     return 99.0
 
 
+class ScoutPlacer:
+    """Places every scout tour in the airspace, keeping as many observations as possible.
+
+    For each tour, in order: its own scout with variants -> a free scout on another pad ->
+    the single cheapest contact removal that makes it fit -> drop the cheapest contact and retry.
+    Contacts removed on the way get a last chance alone on a still-free scout."""
+
+    def __init__(self, world: World, air: Airspace, deadline: float, tours, free):
+        self.world, self.air, self.deadline = world, air, deadline
+        self.caches = {r.s.id: {} for r in tours}
+        self.free: List[ScoutInfo] = free
+        self.obs_end: Dict[int, float] = {}
+        self.lost: List[int] = []
+
+    def _cache(self, scout: ScoutInfo) -> dict:
+        return self.caches.setdefault(scout.id, {})
+
+    def _commit(self, placed, scout: ScoutInfo) -> None:
+        self.air.commit(placed[0])
+        self.obs_end.update(placed[1])
+        if scout in self.free:
+            self.free.remove(scout)
+
+    def _late(self) -> bool:
+        return clock.now() > self.deadline
+
+    def _on_free_scout(self, home_scout: ScoutInfo, cidx, pts) -> bool:
+        """The same tour on a free scout, farthest pad first."""
+        candidates = [] if self._late() else sorted(
+            self.free, key=lambda f: -math.hypot(f.home[0] - home_scout.home[0], f.home[1] - home_scout.home[1]))
+        for fs in candidates:
+            placed = try_place(self.world, fs, cidx, pts, self.air, self.deadline, self._cache(fs))
+            if placed:
+                self._commit(placed, fs)
+                self.free.append(home_scout)   # its own aircraft is now free for someone else
+                return True
+        return False
+
+    def _surgical_trim(self, scout: ScoutInfo, cidx, pts) -> bool:
+        """Removes the single cheapest contact whose removal lets the tour fit."""
+        order = [] if self._late() else sorted(range(len(cidx)), key=lambda i: self.world.cands[cidx[i]].value)
+        for k in order:
+            c2, p2 = cidx[:k] + cidx[k + 1:], pts[:k] + pts[k + 1:]
+            if not c2:
+                break
+            placed = try_place(self.world, scout, c2, p2, self.air, self.deadline, self._cache(scout))
+            if placed:
+                self.lost.append(cidx[k])
+                self._commit(placed, scout)
+                return True
+            if self._late():
+                break
+        return False
+
+    def place_tour(self, r) -> None:
+        cidx, pts = list(r.cands), list(r.pts)
+        while cidx:
+            placed = try_place(self.world, r.s, cidx, pts, self.air, self.deadline, self._cache(r.s))
+            if placed:
+                self._commit(placed, r.s)
+                return
+            if self._on_free_scout(r.s, cidx, pts) or self._surgical_trim(r.s, cidx, pts):
+                return
+            k = min(range(len(cidx)), key=lambda i: self.world.cands[cidx[i]].value)
+            self.lost.append(cidx[k])
+            cidx.pop(k)
+            pts.pop(k)
+
+    def solo_rescue(self) -> None:
+        """Puts each lost contact alone on a still-free scout."""
+        for j in sorted(self.lost, key=lambda jj: -self.world.cands[jj].value):
+            if j in self.obs_end or not self.free or self._late():
+                continue
+            c = self.world.cands[j]
+            for fs in list(self.free):
+                p = self.world.obs_point(c, fs.home, fs.home)
+                placed = try_place(self.world, fs, [j], [p], self.air, self.deadline, self._cache(fs))
+                if placed:
+                    self._commit(placed, fs)
+                    break
+
+
 def place_scouts(world: World, sol: Sol, air: Airspace, deadline: float, log: Optional[dict] = None):
     """Realises and deconflicts every scout. Returns obs end times per contact.
 
-    Tours are placed most urgent first (least take-off slack, then least battery margin). A tour
-    that cannot be placed on its scout is tried on a free scout (another pad, other battery);
-    only then is one contact removed, the cheapest single removal that makes it fit.
-    """
-    obs_end: Dict[int, float] = {}
+    Tours are placed most urgent first (least take-off slack, then least battery margin)."""
     tours = [r for r in sol.routes if r.cands]
-    caches = {r.s.id: {} for r in tours}
-    order = sorted(tours, key=lambda r: (_launch_slack(world, r.s, r.cands, r.pts, caches[r.s.id]),
-                                         r.s.usable - r.energy))
     free = [s for s in world.scouts if not any(r.s is s for r in tours)]
-    lost: List[int] = []
-
-    def commit(placed, s_used):
-        air.commit(placed[0])
-        obs_end.update(placed[1])
-        if s_used in free:
-            free.remove(s_used)
-
+    placer = ScoutPlacer(world, air, deadline, tours, free)
+    order = sorted(tours, key=lambda r: (_launch_slack(world, r.s, r.cands, r.pts, placer.caches[r.s.id]),
+                                         r.s.usable - r.energy))
     for r in order:
-        cidx, pts = list(r.cands), list(r.pts)
-        while cidx:
-            placed = try_place(world, r.s, cidx, pts, air, deadline, caches[r.s.id])
-            if placed:
-                commit(placed, r.s)
-                break
-            # same tour on a free scout, farthest pad first
-            hit = None
-            for fs in ([] if clock.now() > deadline else sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1]))):
-                placed = try_place(world, fs, cidx, pts, air, deadline, caches.setdefault(fs.id, {}))
-                if placed:
-                    hit = fs
-                    break
-            if hit is not None:
-                commit(placed, hit)
-                free.append(r.s)   # its own aircraft is now free for someone else
-                break
-            # surgical trim: remove the single cheapest contact whose removal lets the tour fit
-            done = False
-            for k in ([] if clock.now() > deadline else
-                      sorted(range(len(cidx)), key=lambda i: world.cands[cidx[i]].value)):
-                c2, p2 = cidx[:k] + cidx[k + 1:], pts[:k] + pts[k + 1:]
-                if not c2:
-                    break
-                placed = try_place(world, r.s, c2, p2, air, deadline, caches[r.s.id])
-                if placed:
-                    lost.append(cidx[k])
-                    commit(placed, r.s)
-                    done = True
-                    break
-                if clock.now() > deadline:
-                    break
-            if done:
-                break
-            k = min(range(len(cidx)), key=lambda i: world.cands[cidx[i]].value)
-            lost.append(cidx[k])
-            cidx.pop(k)
-            pts.pop(k)
-    # solo rescue: put each lost contact alone on a still-free scout
-    for j in sorted(lost, key=lambda jj: -world.cands[jj].value):
-        if j in obs_end or not free or clock.now() > deadline:
-            continue
-        c = world.cands[j]
-        for fs in list(free):
-            p = world.obs_point(c, fs.home, fs.home)
-            placed = try_place(world, fs, [j], [p], air, deadline, caches.setdefault(fs.id, {}))
-            if placed:
-                commit(placed, fs)
-                break
+        placer.place_tour(r)
+    placer.solo_rescue()
     if log is not None:
-        log["scout_lost"] = [world.cands[j].id for j in lost if j not in obs_end]
-    return obs_end
+        log["scout_lost"] = [world.cands[j].id for j in placer.lost if j not in placer.obs_end]
+    return placer.obs_end
