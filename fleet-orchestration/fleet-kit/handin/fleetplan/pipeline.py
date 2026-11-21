@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Tuple
 from fleetkit.model import EFFECTOR, SCOUT, Scenario
 from fleetkit.scorer import evaluate
 
-from . import alns, realize
+from . import alns, clock, realize
 from .params import level_params
 from .world import World
 
@@ -90,7 +90,7 @@ def prune_scouts(W: World, sol: alns.Sol, air: realize.Airspace, routes: Dict[st
     scouts = {s.id: s for s in W.scouts}
     confirm = W.rules.confirm_margin_s
     for aid in [a for a in routes if a in scouts]:
-        if time.monotonic() > deadline:
+        if clock.now() > deadline:
             break
         obs = [w for w in routes[aid] if w.get("action") == "observe"]
         keep = [w for w in obs if by_id[w["target"]].kind == "u" or w["target"] in engaged_T]
@@ -132,7 +132,7 @@ def verify_pass(W: World, air: realize.Airspace, routes: Dict[str, List[dict]],
     first_T = {cid: min(routes[e][-1]["t"] for e in es) for cid, es in groups.items()}
     added = 0
     for cid in sorted(last_T, key=lambda c: -by_id[c].points):
-        if time.monotonic() > deadline:
+        if clock.now() > deadline:
             break
         c = by_id[cid]
         gain_pts = r.verify_bonus * c.points
@@ -209,7 +209,7 @@ def solve(sc: Scenario, t_start: float, budget: float, log: Optional[dict] = Non
     cands = getattr(best, "elite", None) or [best]
     best_out = None
     for i, sol in enumerate(cands):
-        if i > 0 and time.monotonic() > t_real - 1.5:
+        if i > 0 and clock.now() > t_real - 1.5:
             break
         routes, groups, air = realize.realise(W, sol, t_real)
         prune_scouts(W, sol, air, routes, groups, t_real)

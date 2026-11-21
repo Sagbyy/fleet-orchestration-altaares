@@ -12,6 +12,7 @@ import random
 import time
 from typing import Dict, List, Optional, Tuple
 
+from . import clock
 from .hungarian import assign
 from .world import GROUP_DT, Cand, ScoutInfo, World, XY
 
@@ -488,7 +489,7 @@ def _move_block(W: World, sol: Sol, deadline: float, size: int) -> bool:
     for k in range(len(routes)):
         rk = routes[k]
         for i in range(len(rk.cands) - size + 1):
-            if time.monotonic() > deadline:
+            if clock.now() > deadline:
                 return False
             block = rk.cands[i:i + size]
             bpts = rk.pts[i:i + size]
@@ -531,7 +532,7 @@ def _merge(W: World, sol: Sol, deadline: float) -> bool:
     empties = [k for k, r in enumerate(routes) if not r.cands]
     for x in range(len(busy)):
         for y in range(x + 1, len(busy)):
-            if time.monotonic() > deadline:
+            if clock.now() > deadline:
                 return False
             k1, k2 = busy[x], busy[y]
             r1, r2 = routes[k1], routes[k2]
@@ -554,7 +555,7 @@ def local_search(W: World, sol: Sol, P: "Params", rng: random.Random, deadline: 
     Returns the better of the input and the polished solution (full objective)."""
     new = sol.copy()
     improved = True
-    while improved and time.monotonic() < deadline:
+    while improved and clock.now() < deadline:
         improved = _move_block(W, new, deadline, 1) or _move_block(W, new, deadline, 2) \
             or _merge(W, new, deadline)
     pool = [c.idx for c in W.cands if c.idx not in new.where]
@@ -675,7 +676,7 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
     best = cur.copy()
     if not W.cands:
         return best
-    t_start = time.monotonic()
+    t_start = clock.now()
     span = max(1e-3, deadline - t_start)
     wd = [1.0] * len(DESTROY)
     wr = [1.0] * len(REPAIRS)
@@ -699,7 +700,8 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
                 return
             del elite[worst]
         elite[key] = sol_.copy()
-    while time.monotonic() < deadline and it - last_best < P.stall:
+    while clock.now() < deadline and it - last_best < P.stall:
+        clock.CLOCK.tick()
         it += 1
         di, ri = _roulette(wd, rng), _roulette(wr, rng)
         new = cur.copy()
@@ -725,13 +727,13 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
         new.evaluate()
         if new.obj > best.obj - P.elite_gap * abs(best.obj):
             keep(new)
-        frac = (time.monotonic() - t_start) / span
+        frac = (clock.now() - t_start) / span
         temp = t0 * max(0.0, 1.0 - frac) + 1e-9
         score = 0.0
         if new.obj > best.obj + 1e-6:
-            if P.local_search and time.monotonic() - last_ls > 0.5:
-                new = local_search(W, new, P, rng, min(deadline, time.monotonic() + 0.4))
-                last_ls = time.monotonic()
+            if P.local_search and clock.now() - last_ls > 0.5:
+                new = local_search(W, new, P, rng, min(deadline, clock.now() + 0.4))
+                last_ls = clock.now()
             best = new.copy()
             cur = new
             score = 33.0
@@ -758,7 +760,7 @@ def run(W: World, deadline: float, P: Params, seed: int = 0, log=None) -> Sol:
                 wr[i] = max(wr[i], 0.05)
                 sr[i], nr[i] = 0.0, 0
     if P.local_search:   # final polish (bounded: the 3D realisation keeps its reserve)
-        best = local_search(W, best, P, rng, time.monotonic() + 0.8)
+        best = local_search(W, best, P, rng, clock.now() + 0.8)
     keep(best)
     best.elite = sorted((e for e in elite.values()), key=lambda e: -e.obj)
     if log is not None:

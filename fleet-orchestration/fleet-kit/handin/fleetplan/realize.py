@@ -18,6 +18,7 @@ from fleetkit.model import Waypoint
 from .sepcheck import separation_item, separation_violation
 
 from .alns import Sol, match
+from . import clock
 from .hungarian import INF, assign
 from .geom import CHECK_MARGIN, free_point, path2d
 from .world import EFF_Z, GROUP_DT, OBS_RHO_HIGH, SCOUT_Z, SCOUT_Z_MODEL, V_SAFE, Cand, EffInfo, ScoutInfo, World, dive_geometry, \
@@ -274,7 +275,7 @@ def _try_place(W: World, s: ScoutInfo, cidx, pts, air: "Airspace", deadline: flo
                 feasible_any = False
                 for delta in SCOUT_DELTAS:
                     tries += 1
-                    if tries > MIN_TRIES and time.monotonic() > deadline:
+                    if tries > MIN_TRIES and clock.now() > deadline:
                         return None
                     wps, info = build_scout(W, s, cidx, pts, z, delta, land, cache, land_slow=slow)
                     if wps is None:
@@ -329,7 +330,7 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
                 break
             # same tour on a free scout, farthest pad first
             hit = None
-            for fs in ([] if time.monotonic() > deadline else sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1]))):
+            for fs in ([] if clock.now() > deadline else sorted(free, key=lambda f: -math.hypot(f.home[0] - r.s.home[0], f.home[1] - r.s.home[1]))):
                 placed = _try_place(W, fs, cidx, pts, air, deadline, caches.setdefault(fs.id, {}))
                 if placed:
                     hit = fs
@@ -340,7 +341,7 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
                 break
             # surgical trim: remove the single cheapest contact whose removal lets the tour fit
             done = False
-            for k in ([] if time.monotonic() > deadline else
+            for k in ([] if clock.now() > deadline else
                       sorted(range(len(cidx)), key=lambda i: W.cands[cidx[i]].value)):
                 c2, p2 = cidx[:k] + cidx[k + 1:], pts[:k] + pts[k + 1:]
                 if not c2:
@@ -351,7 +352,7 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
                     commit(placed, r.s)
                     done = True
                     break
-                if time.monotonic() > deadline:
+                if clock.now() > deadline:
                     break
             if done:
                 break
@@ -361,7 +362,7 @@ def place_scouts(W: World, sol: Sol, air: Airspace, deadline: float, log: Option
             pts.pop(k)
     # solo rescue: put each lost contact alone on a still-free scout
     for j in sorted(lost, key=lambda jj: -W.cands[jj].value):
-        if j in obs_end or not free or time.monotonic() > deadline:
+        if j in obs_end or not free or clock.now() > deadline:
             continue
         c = W.cands[j]
         for fs in list(free):
@@ -482,7 +483,7 @@ def place_group(W: World, air: Airspace, c: Cand, T_base: float, members: List[E
                 break
             for ang0 in angs:
                 tries += 1
-                if tries > MIN_TRIES and time.monotonic() > deadline:
+                if tries > MIN_TRIES and clock.now() > deadline:
                     return None
                 items: List[Item] = []
                 ok = True

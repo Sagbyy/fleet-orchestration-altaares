@@ -1,0 +1,62 @@
+{
+ "L1-0": {
+  "score": 132.496142,
+  "sha256": "cacb33a4712d1ebb65a26d3d6d39fd5f45c00491cf4921b2d56762262b77dda9",
+  "valid": true
+ },
+ "L1-1": {
+  "score": 72.784353,
+  "sha256": "ac136759a550124b981c594b8ab87ef2e41b546ba8a72b35aa65703ac0fb52cc",
+  "valid": true
+ },
+ "L2-0": {
+  "score": 303.13963,
+  "sha256": "fb664e274680f15dedc3fe15441b6e952a6b97159498ec4df87635cb47662a27",
+  "valid": true
+ },
+ "L2-0-verify": {
+  "score": 332.55363,
+  "sha256": "381cb96e6074e50f6c81d2098259fd2742917f81b64ad9c10d9aa480d24af0d6",
+  "valid": true
+ },
+ "L2-1": {
+  "score": 354.891304,
+  "sha256": "02c0bda7ece4663f61a9f0d8b11174dadcc3f4b58c74506b59384c281db9a6b0",
+  "valid": true
+ },
+ "L3-0": {
+  "score": 662.674313,
+  "sha256": "892b15ce26f516adaff91aa7f8d103d09034762a87f16d6f9f9cdb73e09d4bc6",
+  "valid": true
+ },
+ "L3-0-knapsack-weak": {
+  "score": 664.856109,
+  "sha256": "acdbbb22ffde89e15810bf1e4e9412dc45e463672003b0006a0f2b7c170702fa",
+  "valid": true
+ },
+ "L3-1": {
+  "score": 562.071256,
+  "sha256": "1a81e6a134e9130d08c148b0f49f43eccac06ac2d7902dc0935f08908bd25d62",
+  "valid": true
+ },
+ "L3-1-ground": {
+  "score": 562.601688,
+  "sha256": "193e8b56b517123c5cf986e2375e0e66d471fc1c3ac3033982e9fde12640b855",
+  "valid": true
+ },
+ "L4-0": {
+  "score": 1465.596174,
+  "sha256": "bfe2177fef648197de5a102be9f92067ac42d59454365005bdd099d7c0b21a72",
+  "valid": true
+ },
+ "L4-1": {
+  "score": 1446.512,
+  "sha256": "d787553d439e5a2d7ced0bd74840b0e0f49d3ad370a39a5d45a34fb482c418c1",
+  "valid": true
+ },
+ "L4-2-seed7": {
+  "score": 1313.108667,
+  "sha256": "0a21a2693c4470d68e556faa4f1120561fe427458c82259695c2fb27fd8aac03",
+  "valid": true
+ }
+}
