@@ -2,17 +2,24 @@
 
 Obstacles are vertical circles (zones below their ceiling, protected areas around friendly and
 civilian contacts). A leg that would cross one is wrapped around it along a circumscribed polygon,
-so every produced segment stays strictly outside the true circle.
-"""
+so every produced segment stays strictly outside the true circle."""
 from __future__ import annotations
 
 import math
 from typing import List, Optional, Sequence, Tuple
 
+
 TWO_PI = 2.0 * math.pi
+
+
 WRAP_MARGIN = 12.0   # detours follow a circle of radius r + WRAP_MARGIN
+
+
 CHECK_MARGIN = 6.0   # a segment closer than r + CHECK_MARGIN to the centre is blocked
+
+
 MAX_ARC_STEP = math.radians(30.0)
+
 
 XY = Tuple[float, float]
 

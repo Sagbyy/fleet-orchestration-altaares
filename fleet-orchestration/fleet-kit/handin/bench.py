@@ -35,7 +35,7 @@ def seeds(text):
 
 def run_one(args):
     level, seed, budget, overrides, verify = args
-    from fleetplan import params
+    from fleetplan.search import params
     for k, v in overrides.items():
         params.LEVELS[level][k] = v
     from fleetplan.pipeline import solve

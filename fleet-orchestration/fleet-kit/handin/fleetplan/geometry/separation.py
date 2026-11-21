@@ -3,9 +3,17 @@ fleetkit internals that could change. The official validator still has the last 
 from __future__ import annotations
 
 import math
-from typing import Optional, Sequence
+from typing import TYPE_CHECKING, Dict, Iterator, List, Optional, Sequence, Tuple
+
+if TYPE_CHECKING:
+    from fleetkit.model import Aircraft, Contact, Route
+
+Point = Tuple[float, float, float]
+Piece = Tuple[float, float, Point, Point]   # (t0, t1, p0, p1): linear motion from p0 at t0 to p1 at t1
+
 
 EPS = 1e-6
+
 
 def position_at(piece: Piece, t: float) -> Point:
     """Returns the position on a piece at time t."""
@@ -128,7 +136,7 @@ def separation_item(aid: str, route: Route, aircraft: Aircraft):
     return (aid, pieces, pieces[0][0], pieces[-1][1], target)
 
 
-def separation_violation(rules, contacts: Dict[str, Contact], item_a, item_b) -> Optional[Violation]:
+def separation_violation(rules, contacts: Dict[str, Contact], item_a, item_b) -> Optional[tuple]:
     """Checks the separation rule (R8) for one pair of routes; returns the violation, if any."""
     d_sep = rules.d_sep_m - EPS
     aid_a, pa, s_a, e_a, tgt_a = item_a

@@ -1,27 +1,15 @@
-"""Preprocessing: obstacles, candidate contacts, observation rings and per-aircraft estimates."""
+"""Problem model: obstacles, candidate contacts, observation rings and per-aircraft estimates."""
 from __future__ import annotations
 
 import math
-import os
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Tuple
 
 from fleetkit.energy import best_range_speed
 from fleetkit.geometry import hdist
 from fleetkit.model import CIVILIAN, EFFECTOR, FRIENDLY, HOSTILE, SCOUT, UNKNOWN, Aircraft, Scenario
 
-from .geom import Circle, XY, free_point, model_leg
-
-V_SAFE = 0.99          # realised speeds as a fraction of the limits
-OBS_RHO = 146.5        # horizontal offset of an observation point at z = 30 m (3D range 149.5 < 150)
-OBS_RHO_HIGH = 128.0   # max horizontal offset at z = 70 m (3D range 146 < 150)
-SCOUT_Z = (30.0, 70.0)
-SCOUT_Z_MODEL = 30.0
-GROUND_RUN = os.environ.get("FLEET_GROUND_RUN", "0") == "1"   # effectors may fly [home, engage] at z = 0
-EFF_Z = ((0.0,) if GROUND_RUN else ()) + (30.0, 40.0, 80.0, 110.0, 150.0)   # cheapest conflict-free layer wins
-EFF_Z_MODEL = 40.0                   # layer for earliest-arrival estimates (most effectors fly low)
-EFF_Z_ENERGY = 40.0                  # typical layer for energy estimates
-GROUP_DT = 2.0         # arrival spacing between effectors of one engagement
-RING_SAMPLES = 48
+from .config import EFF_Z_ENERGY, EFF_Z_MODEL, GROUP_DT, OBS_RHO, RING_SAMPLES, SCOUT_Z_MODEL, V_SAFE
+from .geometry.obstacles import XY, Circle, free_point, model_leg
 
 
 class ScoutInfo:

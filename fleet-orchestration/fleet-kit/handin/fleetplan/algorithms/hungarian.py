@@ -1,14 +1,16 @@
 """Hungarian algorithm (min-cost assignment) for rectangular matrices, pure Python.
 
 Used for the final effector assignment: rows are engagement slots (one per effector a contact
-needs), columns are effectors of that subtype, costs are energy (infeasible pairs = INF).
-"""
+needs), columns are effectors of that subtype, costs are energy (infeasible pairs = INF)."""
 from __future__ import annotations
 
 import math
 from typing import List, Optional
 
+
 INF = math.inf
+
+
 BIG = 1e9  # stands for an infeasible pair inside the algorithm
 
 
