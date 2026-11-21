@@ -178,28 +178,65 @@ class Sol:
         return self.obj
 
 
-MATCH_ORDER = os.environ.get("FLEET_MATCH_ORDER", "value")
+def knapsack_pick(items, cap: Dict[str, int]) -> List[int]:
+    """Best subset of hostiles under effector counts (exact DP over the scarce subtypes only).
 
-
-def _match_key(C):
-    if MATCH_ORDER == "density":     # value per effector consumed: favours cheap contacts when effectors are scarce
-        return lambda h: -C[h[0]].value / max(1, C[h[0]].n_eff)
-    return lambda h: -C[h[0]].value
+    items: (contact idx, value, needs). When no subtype is scarce every item fits and all are
+    returned; otherwise a 1D or 2D knapsack picks the most valuable feasible subset."""
+    subs = sorted({s for _, _, n in items for s in n})
+    scarce = [s for s in subs if sum(n.get(s, 0) for _, _, n in items) > cap.get(s, 0)]
+    if not scarce:
+        return [j for j, _, _ in items]
+    dp = {tuple(0 for _ in scarce): (0.0, ())}
+    for j, v, n in items:
+        if v <= 0.0:
+            continue
+        add = tuple(n.get(s, 0) for s in scarce)
+        if any(a > cap.get(s, 0) for a, s in zip(add, scarce)):
+            continue
+        new = dict(dp)
+        for st, (val, ch) in dp.items():
+            ns = tuple(a + b for a, b in zip(st, add))
+            if any(x > cap.get(s, 0) for x, s in zip(ns, scarce)):
+                continue
+            nv = val + v
+            cur = new.get(ns)
+            if cur is None or cur[0] < nv:
+                new[ns] = (nv, ch + (j,))
+        dp = new
+    return list(max(dp.values(), key=lambda x: x[0])[1])
 
 
 def match(W: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = None):
-    """Greedy effector matching: richest contacts first, slowest effector that still makes it."""
+    """Effector matching.
+
+    1. pick the best set of hostiles under the effector counts (knapsack when effectors are scarce);
+    2. assign effectors earliest-deadline first, the slowest effector that still makes it;
+    3. fill the remaining effectors greedily with whatever was left out."""
     r = W.rules
     C = W.cands
     used = set()
     served: Dict[int, Tuple[float, List[int]]] = {}
     total = 0.0
-    for j, oe in sorted(hostiles, key=_match_key(C)):
+    window = {}
+    for j, oe in hostiles:
         c = C[j]
         t_lo = max(oe + r.confirm_margin_s + 0.5, c.lo + 0.05)
         t_hi = c.hi - GROUP_DT * (c.n_eff - 1) - 0.5
-        if t_lo > t_hi:
-            continue
+        if t_lo <= t_hi:
+            window[j] = (t_lo, t_hi)
+    cap: Dict[str, int] = {}
+    for e in W.effs:
+        if avail is None or e.k in avail:
+            cap[e.sub] = cap.get(e.sub, 0) + 1
+    chosen = knapsack_pick([(j, C[j].value, C[j].needs) for j in window], cap) if KNAPSACK else []
+    chosen_set = set(chosen)
+    rest = sorted((j for j in window if j not in chosen_set), key=lambda j: -C[j].value)
+    order = sorted(chosen, key=lambda j: window[j][1]) + rest
+
+    for j in order:
+        c = C[j]
+        t_lo, t_hi = window[j]
         pick = []
         ok = True
         for sub, n in c.needs.items():
@@ -221,6 +258,9 @@ def match(W: World, hostiles: List[Tuple[int, float]], avail: Optional[set] = No
         served[j] = (T, [e.k for e in pick])
         total += c.points - r.c_eff * len(pick) - r.lambda_e * sum(e.energy[j] for e in pick)
     return served, total
+
+
+KNAPSACK = os.environ.get("FLEET_KNAPSACK", "0") == "1"
 
 
 # ---- insertion ------------------------------------------------------------------------------
@@ -588,7 +628,25 @@ def d_sector(W, sol, q, rng):
     return sorted(js, key=lambda j: math.hypot(W.cands[j].x - c0.x, W.cands[j].y - c0.y))[:q]
 
 
-DESTROY = [d_random, d_worst, d_related, d_route, d_sector]
+def d_weak_route(W, sol, q, rng):
+    """Empties the tour with the lowest value per Wh, so its contacts get absorbed by other
+    tours: consolidation frees a scout and saves a base round trip."""
+    lam = W.rules.lambda_e
+    busy = [r for r in sol.routes if r.cands]
+    if len(busy) < 2:
+        return []
+
+    def worth(r):
+        v = sum(W.cands[j].value if (W.cands[j].kind == "u" or j in sol.served) else 0.0 for j in r.cands)
+        return (v - lam * r.energy) / max(1.0, r.energy)
+
+    busy.sort(key=worth)
+    pick = busy[0] if rng.random() < 0.7 else rng.choice(busy[:3])
+    return list(pick.cands)
+
+
+DESTROY = [d_random, d_worst, d_related, d_route, d_sector] + \
+    ([d_weak_route] if os.environ.get("FLEET_WEAK_ROUTE", "0") == "1" else [])
 REPAIRS = [("regret", True, 0.0), ("regret_noise", True, 1.0), ("greedy_noise", False, 1.0)]
 
 
