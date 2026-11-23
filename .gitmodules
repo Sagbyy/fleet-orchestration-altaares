@@ -1,3 +1,0 @@
-[submodule "search-destroy/external/gym-pybullet-drones"]
-	path = search-destroy/external/gym-pybullet-drones
-	url = https://github.com/learnsyslab/gym-pybullet-drones.git

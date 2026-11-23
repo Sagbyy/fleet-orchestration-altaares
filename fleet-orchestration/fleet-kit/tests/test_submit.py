@@ -151,3 +151,31 @@ def test_plans_can_be_written_into_a_folder_that_does_not_exist_yet(home):
     assert cli_main(["generate", "L1", "101", "-o", str(home / "val" / "L1-101.json")]) == 0
     assert cli_main(["baseline", str(home / "val" / "L1-101.json"), "-o", str(home / "my-plans" / "L1-101.json")]) == 0
     assert json.loads((home / "my-plans" / "L1-101.json").read_text())["routes"]
+
+
+def test_the_login_file_is_private_from_the_first_byte_even_over_a_loose_one(home):
+    import os
+    old = os.umask(0o022)
+    try:
+        from pathlib import Path
+        with pytest.MonkeyPatch.context() as mp:
+            mp.setattr(Path, "chmod", lambda *a, **k: None)         # no later chmod: the creation itself must be private
+            fresh = sub.save_config("http://x:1", "Alpha", "tok")
+            assert fresh.stat().st_mode & 0o777 == 0o600
+            fresh.unlink()
+        path = sub.save_config("http://x:1", "Alpha", "tok")
+        assert path.stat().st_mode & 0o777 == 0o600
+        path.chmod(0o644)                                         # a looser file that already exists is tightened
+        sub.save_config("http://x:1", "Alpha", "tok2")
+        assert path.stat().st_mode & 0o777 == 0o600
+    finally:
+        os.umask(old)
+
+
+def test_board_login_asks_for_the_token_when_it_is_left_out(home, monkeypatch):
+    import getpass
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": "  typed-token ")
+    assert cli_main(["board-login", "--server", "http://x:1", "--team", "Alpha"]) == 0
+    assert sub.load_config()["token"] == "typed-token"
+    monkeypatch.setattr(getpass, "getpass", lambda prompt="": "")
+    assert cli_main(["board-login", "--server", "http://x:1", "--team", "Alpha"]) == 1

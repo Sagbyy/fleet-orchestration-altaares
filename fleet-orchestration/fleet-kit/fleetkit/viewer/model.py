@@ -19,6 +19,29 @@ MAX_SAMPLES = 60000          # aircraft x time samples before the step is widene
 VERSION = 1
 
 
+SAFE_TEXT = re.compile(r"^[A-Za-z0-9][A-Za-z0-9 _.:+\-]{0,59}$")
+
+
+def check_safe_text(scenario: Scenario, events: Optional[dict] = None) -> None:
+    """Refuses ids, classes and levels the page could mistake for markup (a hand-made scenario or events file).
+
+    The page writes these into HTML; generated scenarios always pass. Everything else shown is escaped.
+
+    Raises:
+        ValueError: when a field holds characters other than letters, digits, space and `_ . : + -`.
+    """
+    fields = [("level", scenario.level)]
+    fields += [("zone id", z.id) for z in scenario.zones]
+    fields += [("contact id", c.id) for c in scenario.contacts] + [("contact class", c.cls) for c in scenario.contacts]
+    fields += [("aircraft id", a.id) for a in scenario.aircraft]
+    fields += [("aircraft type", a.type) for a in scenario.aircraft] + [("aircraft subtype", a.subtype) for a in scenario.aircraft if a.subtype]
+    for e in (events or {}).get("events", []) or []:
+        fields += [(f"event {key}", e[key]) for key in ("kind", "contact", "aircraft", "zone", "to") if isinstance(e, dict) and e.get(key) is not None]
+    for what, value in fields:
+        if not isinstance(value, str) or not SAFE_TEXT.match(value):
+            raise ValueError(f"the viewer cannot show this file: {what} {str(value)[:40]!r} has characters other than letters, digits, space and _ . : + -")
+
+
 def _r1(v: float) -> float:
     return round(float(v), 1)
 
@@ -132,6 +155,7 @@ def build_model(scenario: Scenario, plan: Optional[dict] = None, *, events: Opti
     Returns:
         A dictionary the page embeds.
     """
+    check_safe_text(scenario, events)
     rules = scenario.rules
     xs = [c.pos[0] for c in scenario.contacts] + [a.home[0] for a in scenario.aircraft]
     ys = [c.pos[1] for c in scenario.contacts] + [a.home[1] for a in scenario.aircraft]

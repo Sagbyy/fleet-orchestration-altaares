@@ -28,6 +28,7 @@ python3 -m fleetkit view scenario.json plan.json --open  # watch it fly
 python3 handin/check_handin.py                           # runs your hand-in the way we will
 ```
 
+**Optional second part:** the link to the ground is cut mid-mission. Write a policy that keeps the mission safe with what the aircraft sense and hear from each other, using as little communication as you can. See [`fleet-kit/LINKLOSS.md`](fleet-kit/LINKLOSS.md).
 
 ## Hypotheses
 
@@ -77,7 +78,7 @@ While you work, see how your planner compares. Upload **plans** (not code) for e
 
 ```sh
 cd fleet-kit
-python3 -m fleetkit board-login --server http://<address>:8080 --team "Your team" --token <token>   # address and token: from the organisers
+python3 -m fleetkit board-login --server http://<address>:8080 --team "Your team" --token <token>   # address and token: from the organisers (leave --token out to be asked for it)
 python3 -m fleetkit validation-set -o validation          # writes the 8 public scenarios
 python3 -m fleetkit baseline validation/L1-101.json -o my-plans/L1-101.json   # or your own planner; name each plan after its scenario
 python3 -m fleetkit submit-all my-plans/                  # or one at a time: submit L3-301 my-plans/L3-301.json
@@ -88,5 +89,7 @@ Open the address in a browser to watch the board. You appear as soon as one plan
 ## Hand-in
 
 Put your planner in a folder with a file `planner.py` (the template is in `fleet-kit/handin/`). Python standard library only ; anything else you need goes inside your folder. `check_handin.py` runs your folder exactly the way we will, on generated scenarios.
+
+For the link-loss part, add a file `policy.py` defining `Policy` in the same folder; `check_policy.py` checks it. It is scored separately and does not change the Plan it ranking.
 
 Hand-in deadline November 22nd, midday.

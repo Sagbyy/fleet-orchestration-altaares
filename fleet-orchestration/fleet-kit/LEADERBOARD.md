@@ -20,6 +20,8 @@ Your organisers give you the server address, your team name and a token. Save th
 python3 -m fleetkit board-login --server http://<address>:8080 --team "Your team" --token <token>
 ```
 
+Leave `--token` out and the client asks for it, so it stays out of your shell history. The login is saved in your home folder, readable by you only. The venue network is shared and the board speaks plain HTTP, so use this token only for the board and do not post it anywhere.
+
 Then, for one scenario or for a whole folder (plans named `L1-101.json`, `L2-201.json`, ...):
 
 ```sh
@@ -29,13 +31,15 @@ python3 -m fleetkit submit-all my-plans/
 
 `submit` first checks your plan with the local validator and does not send one that is invalid (`--force` sends it anyway, to see what the server says). The server keeps your **best** score per scenario, so a worse plan never hurts you. Wait a couple of seconds between submissions; the client does it for you.
 
+The board validates one plan per team at a time and is shared by everyone, so if it answers "still being validated" or "busy", wait a moment and send again (the client retries for you). It refuses plans of more than 1 MB, 150 routes or 6000 waypoints altogether: the shipped baseline is far below that, and a plan that needs more is probably not what you mean to send.
+
 ## What the board shows
 
 - Per team: the sum of your best scores per level (L1 to L4), the total, the total against the shipped greedy baseline ("× base"), and how many of the eight scenarios you have a plan for.
 - A feed of the latest improvements.
 - Ties go to the team that reached the score first.
 
-Open the address in a browser. Teams see each other's scores, never each other's plans.
+Open the address in a browser. Teams see each other's scores. The board does not publish anyone's plans or tokens.
 
 ## What it does not prove
 

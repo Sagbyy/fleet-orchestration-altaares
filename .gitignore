@@ -5,3 +5,6 @@ scenario.json
 plan.json
 plan.svg
 .fleetkit-board.json
+fleet-orchestration/fleet-kit/validation/
+fleet-orchestration/fleet-kit/my-plans/
+fleet-orchestration/fleet-kit/my-plans-verify/
